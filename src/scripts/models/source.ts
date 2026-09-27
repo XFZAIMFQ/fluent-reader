@@ -53,7 +53,7 @@ export class RSSSource {
         this.name = name
         this.openTarget = SourceOpenTarget.Local
         this.lastFetched = new Date()
-        this.fetchFrequency = 0
+        this.fetchFrequency = 60
         this.textDir = SourceTextDirection.LTR
         this.hidden = false
     }
