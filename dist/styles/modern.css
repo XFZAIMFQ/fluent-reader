@@ -19,7 +19,8 @@ body,
     height: 40px;
     background: transparent;
     border: 0;
-    pointer-events: none;
+    pointer-events: auto;
+    -webkit-app-region: no-drag;
 }
 
 #root > nav span.title {
@@ -421,13 +422,14 @@ body.darwin .modern-brand strong {
     content: "";
     position: absolute;
     top: 0;
-    right: 0;
+    right: 144px;
     left: 0;
     height: 40px;
     -webkit-app-region: drag;
 }
 
 .modern-embedded-article-header {
+    position: relative;
     display: flex;
     flex: 0 0 76px;
     align-items: flex-end;
@@ -436,6 +438,16 @@ body.darwin .modern-brand strong {
     height: 76px;
     padding: 40px 8px 0 16px;
     box-sizing: border-box;
+    -webkit-app-region: no-drag;
+}
+
+.modern-embedded-article-header::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 144px;
+    left: 0;
+    height: 40px;
     -webkit-app-region: drag;
 }
 
@@ -523,7 +535,7 @@ body.darwin .modern-brand strong {
     height: 104px;
     padding: 38px 28px 26px;
     box-sizing: border-box;
-    -webkit-app-region: drag;
+    -webkit-app-region: no-drag;
 }
 
 .modern-feed-heading img {
