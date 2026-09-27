@@ -1,8 +1,9 @@
 import * as React from "react"
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import intl from "react-intl-universal"
 import { Feed } from "./feeds/feed"
 import ModernFeed from "./feeds/modern-feed"
+import FeedToolbar from "./feeds/feed-toolbar"
 import { Icon, FocusTrapZone } from "@fluentui/react"
 import ArticleContainer from "../containers/article-container"
 import { SourceCategory, ViewType } from "../schema-types"
@@ -30,6 +31,9 @@ const usePageClasses = makeStyles({
     },
 })
 
+const resizeLimit = (element: HTMLElement) =>
+    Math.max(300, Math.min(680, element.parentElement.clientWidth - 325))
+
 const Page: React.FC = () => {
     const dispatch = useAppDispatch()
     const pageClasses = usePageClasses()
@@ -48,32 +52,81 @@ const Page: React.FC = () => {
         return saved >= 300 && saved <= 680 ? saved : 390
     })
     const [dragging, setDragging] = useState(false)
+    const dividerRef = useRef<HTMLDivElement>(null)
+    const widthRef = useRef(listWidth)
+    const preferredWidthRef = useRef(listWidth)
+    const stopResizeRef = useRef<() => void>()
 
-    const resizeLimit = (element: Element) =>
-        Math.max(300, Math.min(680, element.parentElement.clientWidth - 325))
+    useEffect(() => {
+        const divider = dividerRef.current
+        if (!divider?.parentElement) return
+        const observer = new ResizeObserver(() => {
+            const width = Math.min(
+                preferredWidthRef.current,
+                resizeLimit(divider)
+            )
+            if (width !== widthRef.current) {
+                widthRef.current = width
+                setListWidth(width)
+            }
+        })
+        observer.observe(divider.parentElement)
+        return () => {
+            observer.disconnect()
+            stopResizeRef.current?.()
+        }
+    }, [contentView])
 
-    const startResize = (event: React.MouseEvent) => {
+    useEffect(() => () => stopResizeRef.current?.(), [])
+
+    const startResize = (event: React.PointerEvent<HTMLDivElement>) => {
+        if (event.button !== 0) return
         event.preventDefault()
+        stopResizeRef.current?.()
+        const divider = event.currentTarget
+        const pointerId = event.pointerId
         setDragging(true)
         const startX = event.clientX
-        const initialWidth = listWidth
-        const maxWidth = resizeLimit(event.currentTarget)
-        let nextWidth = initialWidth
-        const onMove = (moveEvent: MouseEvent) => {
-            nextWidth = Math.max(
+        const initialWidth = widthRef.current
+        const onMove = (moveEvent: PointerEvent) => {
+            if (moveEvent.pointerId !== pointerId) return
+            const nextWidth = Math.max(
                 300,
-                Math.min(maxWidth, initialWidth + moveEvent.clientX - startX)
+                Math.min(
+                    resizeLimit(divider),
+                    initialWidth + moveEvent.clientX - startX
+                )
             )
+            widthRef.current = nextWidth
+            preferredWidthRef.current = nextWidth
             setListWidth(nextWidth)
         }
-        const onUp = () => {
+        const stop = () => {
+            if (stopResizeRef.current !== stop) return
+            stopResizeRef.current = undefined
             setDragging(false)
-            localStorage.setItem("modernListWidth", String(nextWidth))
-            window.removeEventListener("mousemove", onMove)
-            window.removeEventListener("mouseup", onUp)
+            localStorage.setItem(
+                "modernListWidth",
+                String(preferredWidthRef.current)
+            )
+            window.removeEventListener("pointermove", onMove)
+            window.removeEventListener("pointerup", onUp)
+            window.removeEventListener("pointercancel", onUp)
+            window.removeEventListener("blur", stop)
+            divider.removeEventListener("lostpointercapture", stop)
+            if (divider.hasPointerCapture(pointerId))
+                divider.releasePointerCapture(pointerId)
         }
-        window.addEventListener("mousemove", onMove)
-        window.addEventListener("mouseup", onUp)
+        const onUp = (upEvent: PointerEvent) => {
+            if (upEvent.pointerId === pointerId) stop()
+        }
+        stopResizeRef.current = stop
+        divider.setPointerCapture(pointerId)
+        window.addEventListener("pointermove", onMove)
+        window.addEventListener("pointerup", onUp)
+        window.addEventListener("pointercancel", onUp)
+        window.addEventListener("blur", stop)
+        divider.addEventListener("lostpointercapture", stop)
     }
 
     const handleDismissItem = useCallback(() => dispatch(dismissItem()), [])
@@ -108,6 +161,7 @@ const Page: React.FC = () => {
                                 ? intl.get("allArticles")
                                 : intl.get("contentView.articles")}
                         </strong>
+                        <FeedToolbar />
                     </div>
                     <Feed
                         viewType={ViewType.List}
@@ -116,6 +170,7 @@ const Page: React.FC = () => {
                     />
                 </div>
                 <div
+                    ref={dividerRef}
                     className={`modern-reader-divider ${
                         dragging ? "dragging" : ""
                     }`}
@@ -126,7 +181,7 @@ const Page: React.FC = () => {
                     aria-valuemin={300}
                     aria-valuemax={680}
                     aria-valuenow={listWidth}
-                    onMouseDown={startResize}
+                    onPointerDown={startResize}
                     onKeyDown={event => {
                         if (
                             event.key !== "ArrowLeft" &&
@@ -142,13 +197,16 @@ const Page: React.FC = () => {
                                 listWidth + direction
                             )
                         )
+                        widthRef.current = width
+                        preferredWidthRef.current = width
                         setListWidth(width)
                         localStorage.setItem("modernListWidth", String(width))
                     }}
                 />
+                {dragging && <div className="modern-reader-resize-overlay" />}
                 {itemId ? (
                     <div className="side-article-wrapper">
-                        <ArticleContainer itemId={itemId} />
+                        <ArticleContainer itemId={itemId} embedded />
                     </div>
                 ) : (
                     <div className="side-logo-wrapper">
@@ -166,6 +224,7 @@ const Page: React.FC = () => {
     ) : (
         <>
             <div key="card" className="main modern-collection">
+                <div className="modern-window-drag-region" />
                 <ArticleSearch />
                 <ModernFeed feedId={feedId} view={contentView} />
             </div>

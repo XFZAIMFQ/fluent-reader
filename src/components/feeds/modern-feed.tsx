@@ -6,6 +6,7 @@ import { getItemMedia, markRead, RSSItem } from "../../scripts/models/item"
 import { showItem } from "../../scripts/models/page"
 import { useAppDispatch, useAppSelector } from "../../scripts/reducer"
 import Time from "../utils/time"
+import FeedToolbar from "./feed-toolbar"
 
 const ModernFeed: React.FC<{ feedId: string; view: ContentView }> = ({
     feedId,
@@ -49,6 +50,7 @@ const ModernFeed: React.FC<{ feedId: string; view: ContentView }> = ({
                         : intl.get(`contentView.${view}`) || view}
                 </h1>
                 {!selectedSource && <span>{items.length}</span>}
+                <FeedToolbar />
             </header>
             <div className="modern-feed-items">
                 {items.map(item => {

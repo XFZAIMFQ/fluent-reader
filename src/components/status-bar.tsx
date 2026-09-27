@@ -1,10 +1,8 @@
 import * as React from "react"
 import intl from "react-intl-universal"
 import { Icon } from "@fluentui/react"
-import { fetchItems } from "../scripts/models/item"
 import {
     exitSettings,
-    openMarkAllMenu,
     toggleLogMenu,
     toggleSettings,
 } from "../scripts/models/app"
@@ -21,8 +19,6 @@ const StatusBar: React.FC = () => {
         source => !source.hidden && (!app.privacyMode || !source.private)
     )
     const unread = visible.reduce((sum, source) => sum + source.unreadCount, 0)
-    const fetching =
-        !app.sourceInit || !app.feedInit || app.syncing || app.fetchingItems
 
     return (
         <footer className="modern-statusbar">
@@ -33,21 +29,6 @@ const StatusBar: React.FC = () => {
             <FlatButtonGroup styleClass="modern-statusbar-actions">
                 {!settingsOn && (
                     <>
-                        <FlatButton
-                            fetching={fetching}
-                            disabled={fetching}
-                            ariaLabel={intl.get("nav.refresh")}
-                            title={intl.get("nav.refresh")}
-                            onClick={() => dispatch(fetchItems())}>
-                            <Icon iconName="Refresh" />
-                        </FlatButton>
-                        <FlatButton
-                            id="mark-all-toggle"
-                            ariaLabel={intl.get("nav.markAllRead")}
-                            title={intl.get("nav.markAllRead")}
-                            onClick={() => dispatch(openMarkAllMenu())}>
-                            <Icon iconName="InboxCheck" />
-                        </FlatButton>
                         <FlatButton
                             id="log-toggle"
                             ariaLabel={intl.get("nav.notifications")}

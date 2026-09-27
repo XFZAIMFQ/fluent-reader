@@ -310,7 +310,16 @@ body.darwin .modern-brand strong {
     box-sizing: border-box;
     color: var(--neutralPrimary);
     font-size: 17px;
+    justify-content: space-between;
+    gap: 8px;
     -webkit-app-region: drag;
+}
+
+.modern-list-heading strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .modern-reader .list-feed {
@@ -357,16 +366,34 @@ body.darwin .modern-brand strong {
 
 .modern-reader-divider {
     position: relative;
-    z-index: 2;
-    flex: 0 0 5px;
-    width: 5px;
-    background: var(--neutralQuaternaryAlt);
+    z-index: 3;
+    flex: 0 0 9px;
+    width: 9px;
+    background: transparent;
     cursor: col-resize;
+    touch-action: none;
 }
 
-.modern-reader-divider:hover,
-.modern-reader-divider.dragging {
+.modern-reader-divider::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 4px;
+    width: 1px;
+    background: var(--neutralQuaternaryAlt);
+}
+
+.modern-reader-divider:hover::after,
+.modern-reader-divider.dragging::after {
     background: var(--primary);
+}
+
+.modern-reader-resize-overlay {
+    position: fixed;
+    z-index: 30;
+    inset: 0;
+    cursor: col-resize;
 }
 
 .modern-reader .side-article-wrapper,
@@ -384,6 +411,66 @@ body.darwin .modern-brand strong {
 .modern-reader .side-article-wrapper .article > .ms-Stack {
     border-top: 0;
     border-bottom: 0;
+}
+
+.modern-reader .side-logo-wrapper {
+    position: relative;
+}
+
+.modern-reader .side-logo-wrapper::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    height: 40px;
+    -webkit-app-region: drag;
+}
+
+.modern-embedded-article-header {
+    display: flex;
+    flex: 0 0 76px;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 8px;
+    height: 76px;
+    padding: 40px 8px 0 16px;
+    box-sizing: border-box;
+    -webkit-app-region: drag;
+}
+
+.modern-embedded-article-source {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.modern-embedded-article-source .source-name {
+    display: block;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    line-height: 36px;
+}
+
+.modern-embedded-article-actions {
+    display: flex;
+    flex: 0 0 auto;
+    -webkit-app-region: no-drag;
+}
+
+.modern-embedded-article-actions button {
+    width: 32px;
+    height: 36px;
+    border-radius: 6px;
+}
+
+.modern-reader .modern-embedded-article webview,
+.modern-reader .modern-embedded-article .error-prompt {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: calc(100% - 76px);
 }
 
 .modern-empty-reader {
@@ -408,9 +495,18 @@ body.darwin .modern-brand strong {
     background: var(--white);
 }
 
+.modern-window-drag-region {
+    position: fixed;
+    z-index: 2;
+    top: 0;
+    left: 278px;
+    right: 144px;
+    height: 34px;
+    -webkit-app-region: drag;
+}
+
 .modern-feed {
-    max-width: 1120px;
-    margin: auto;
+    width: 100%;
     padding: 38px 28px 70px;
     box-sizing: border-box;
 }
@@ -431,9 +527,13 @@ body.darwin .modern-brand strong {
 }
 
 .modern-feed-heading h1 {
+    min-width: 0;
+    overflow: hidden;
     margin: 0;
     font-size: 22px;
     font-weight: 650;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .modern-feed-heading span {
@@ -539,7 +639,7 @@ body.darwin .modern-brand strong {
 }
 
 .modern-feed-pictures .modern-feed-items {
-    grid-template-columns: repeat(auto-fill, minmax(205px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
 }
 
 .modern-feed-pictures .modern-entry,
@@ -590,7 +690,7 @@ body.darwin .modern-brand strong {
 }
 
 .modern-feed-videos .modern-feed-items {
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
     gap: 20px;
 }
 
@@ -600,7 +700,7 @@ body.darwin .modern-brand strong {
 
 .modern-entry-video {
     position: relative;
-    height: 152px;
+    aspect-ratio: 16 / 9;
     overflow: hidden;
     border-radius: 9px;
     background: var(--neutralLight);

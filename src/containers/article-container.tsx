@@ -25,6 +25,7 @@ import {
 
 type ArticleContainerProps = {
     itemId: number
+    embedded?: boolean
 }
 
 const getItem = (state: RootState, props: ArticleContainerProps) =>

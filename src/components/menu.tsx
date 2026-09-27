@@ -223,7 +223,6 @@ export const Menu: React.FC = () => {
                             : ""
                     }`}
                     onClick={() => selectView(view)}>
-                    <span className="modern-source-icon">◫</span>
                     <span className="modern-source-name">{label(view)}</span>
                     {unread > 0 && <small>{unread}</small>}
                 </button>
@@ -379,10 +378,8 @@ const SourceRow: React.FC<{
         }`}
         onClick={onClick}
         onContextMenu={onContextMenu}>
-        {source.iconurl ? (
+        {source.iconurl && (
             <img className="modern-source-icon" src={source.iconurl} alt="" />
-        ) : (
-            <span className="modern-source-icon">◫</span>
         )}
         <span className="modern-source-name">{source.name}</span>
         {source.unreadCount > 0 && <small>{source.unreadCount}</small>}

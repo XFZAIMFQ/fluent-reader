@@ -24,6 +24,7 @@ const FONT_SIZE_OPTIONS = [12, 13, 14, 15, 16, 17, 18, 19, 20]
 
 type ArticleProps = {
     item: RSSItem
+    embedded?: boolean
     source: RSSSource
     locale: string
     shortcuts: (item: RSSItem, e: KeyboardEvent) => void
@@ -374,98 +375,116 @@ class Article extends React.Component<ArticleProps, ArticleState> {
         }&m=${this.state.loadFull ? 1 : 0}`
     }
 
+    articleSource = () => (
+        <span className="source-name">
+            {this.state.loaded ? (
+                this.props.source.iconurl && (
+                    <img className="favicon" src={this.props.source.iconurl} />
+                )
+            ) : (
+                <Spinner size="extra-tiny" />
+            )}
+            {this.props.source.name}
+            {this.props.item.creator && (
+                <span className="creator">{this.props.item.creator}</span>
+            )}
+        </span>
+    )
+
+    articleActions = () => (
+        <>
+            <CommandBarButton
+                title={
+                    this.props.item.hasRead
+                        ? intl.get("article.markUnread")
+                        : intl.get("article.markRead")
+                }
+                iconProps={
+                    this.props.item.hasRead
+                        ? { iconName: "StatusCircleRing" }
+                        : {
+                              iconName: "RadioBtnOn",
+                              style: {
+                                  fontSize: 14,
+                                  textAlign: "center",
+                              },
+                          }
+                }
+                onClick={() => this.props.toggleHasRead(this.props.item)}
+            />
+            <CommandBarButton
+                title={
+                    this.props.item.starred
+                        ? intl.get("article.unstar")
+                        : intl.get("article.star")
+                }
+                iconProps={{
+                    iconName: this.props.item.starred
+                        ? "FavoriteStarFill"
+                        : "FavoriteStar",
+                }}
+                onClick={() => this.props.toggleStarred(this.props.item)}
+            />
+            <CommandBarButton
+                title={intl.get("article.loadFull")}
+                className={this.state.loadFull ? "active" : ""}
+                iconProps={{ iconName: "RawSource" }}
+                onClick={this.toggleFull}
+            />
+            <CommandBarButton
+                title={intl.get("article.loadWebpage")}
+                className={this.state.loadWebpage ? "active" : ""}
+                iconProps={{ iconName: "Globe" }}
+                onClick={this.toggleWebpage}
+            />
+            <CommandBarButton
+                title={intl.get("more")}
+                iconProps={{ iconName: "More" }}
+                menuIconProps={{ style: { display: "none" } }}
+                menuProps={this.moreMenuProps()}
+            />
+        </>
+    )
+
     render = () => (
-        <FocusZone className="article">
-            <Stack horizontal style={{ height: 36 }}>
-                <span style={{ width: 96 }}></span>
-                <Stack
-                    className="actions"
-                    grow
-                    horizontal
-                    tokens={{ childrenGap: 12 }}>
-                    <Stack.Item grow>
-                        <span className="source-name">
-                            {this.state.loaded ? (
-                                this.props.source.iconurl && (
-                                    <img
-                                        className="favicon"
-                                        src={this.props.source.iconurl}
-                                    />
-                                )
-                            ) : (
-                                <Spinner size="extra-tiny" />
-                            )}
-                            {this.props.source.name}
-                            {this.props.item.creator && (
-                                <span className="creator">
-                                    {this.props.item.creator}
-                                </span>
-                            )}
-                        </span>
-                    </Stack.Item>
-                    <CommandBarButton
-                        title={
-                            this.props.item.hasRead
-                                ? intl.get("article.markUnread")
-                                : intl.get("article.markRead")
-                        }
-                        iconProps={
-                            this.props.item.hasRead
-                                ? { iconName: "StatusCircleRing" }
-                                : {
-                                      iconName: "RadioBtnOn",
-                                      style: {
-                                          fontSize: 14,
-                                          textAlign: "center",
-                                      },
-                                  }
-                        }
-                        onClick={() =>
-                            this.props.toggleHasRead(this.props.item)
-                        }
-                    />
-                    <CommandBarButton
-                        title={
-                            this.props.item.starred
-                                ? intl.get("article.unstar")
-                                : intl.get("article.star")
-                        }
-                        iconProps={{
-                            iconName: this.props.item.starred
-                                ? "FavoriteStarFill"
-                                : "FavoriteStar",
-                        }}
-                        onClick={() =>
-                            this.props.toggleStarred(this.props.item)
-                        }
-                    />
-                    <CommandBarButton
-                        title={intl.get("article.loadFull")}
-                        className={this.state.loadFull ? "active" : ""}
-                        iconProps={{ iconName: "RawSource" }}
-                        onClick={this.toggleFull}
-                    />
-                    <CommandBarButton
-                        title={intl.get("article.loadWebpage")}
-                        className={this.state.loadWebpage ? "active" : ""}
-                        iconProps={{ iconName: "Globe" }}
-                        onClick={this.toggleWebpage}
-                    />
-                    <CommandBarButton
-                        title={intl.get("more")}
-                        iconProps={{ iconName: "More" }}
-                        menuIconProps={{ style: { display: "none" } }}
-                        menuProps={this.moreMenuProps()}
-                    />
+        <FocusZone
+            className={
+                this.props.embedded
+                    ? "article modern-embedded-article"
+                    : "article"
+            }>
+            {this.props.embedded ? (
+                <header className="modern-embedded-article-header">
+                    <div className="modern-embedded-article-source">
+                        {this.articleSource()}
+                    </div>
+                    <div className="modern-embedded-article-actions">
+                        {this.articleActions()}
+                    </div>
+                </header>
+            ) : (
+                <Stack horizontal style={{ height: 36 }}>
+                    <span style={{ width: 96 }}></span>
+                    <Stack
+                        className="actions"
+                        grow
+                        horizontal
+                        tokens={{ childrenGap: 12 }}>
+                        <Stack.Item grow>{this.articleSource()}</Stack.Item>
+                        {this.articleActions()}
+                    </Stack>
+                    <Stack
+                        horizontal
+                        horizontalAlign="end"
+                        style={{ width: 112 }}>
+                        <CommandBarButton
+                            title={intl.get("close")}
+                            iconProps={{ iconName: "BackToWindow" }}
+                            onClick={this.props.dismiss}
+                        />
+                    </Stack>
                 </Stack>
-                <Stack horizontal horizontalAlign="end" style={{ width: 112 }}>
-                    <CommandBarButton
-                        title={intl.get("close")}
-                        iconProps={{ iconName: "BackToWindow" }}
-                        onClick={this.props.dismiss}
-                    />
-                </Stack>
-            </Stack>
+            )}
             {(!this.state.loadFull || this.state.fullContent) && (
                 <webview
                     id="article"
