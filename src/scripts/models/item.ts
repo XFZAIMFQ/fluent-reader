@@ -24,6 +24,20 @@ import {
     SYNC_LOCAL_ITEMS,
 } from "./service"
 
+export interface RSSMedia {
+    images?: string[]
+    videoUrl?: string
+    duration?: number
+}
+
+export function getItemMedia(item: RSSItem): RSSMedia {
+    try {
+        return JSON.parse(item.media || "{}") as RSSMedia
+    } catch {
+        return {}
+    }
+}
+
 export class RSSItem {
     _id: number
     source: number
@@ -40,6 +54,7 @@ export class RSSItem {
     hidden: boolean
     notify: boolean
     serviceRef?: string
+    media: string
 
     constructor(item: MyParserItem, source: RSSSource) {
         for (let field of ["title", "link", "creator"]) {
@@ -50,12 +65,18 @@ export class RSSItem {
         this.title = item.title || intl.get("article.untitled")
         this.link = item.link || ""
         this.fetchedDate = new Date()
-        this.date = new Date(item.isoDate ?? item.pubDate ?? this.fetchedDate)
+        const parsedDate = new Date(
+            item.isoDate ?? item.pubDate ?? this.fetchedDate
+        )
+        this.date = Number.isNaN(parsedDate.getTime())
+            ? this.fetchedDate
+            : parsedDate
         this.creator = item.creator
         this.hasRead = false
         this.starred = false
         this.hidden = false
         this.notify = false
+        this.media = "{}"
     }
 
     static parseContent(item: RSSItem, parsed: MyParserItem) {
@@ -100,7 +121,64 @@ export class RSSItem {
         ) {
             delete item.thumb
         }
+
+        const media: RSSMedia = { images: [] }
+        const addImage = (url: string) => {
+            const identity = url?.replace(/^https?:\/\//i, "//")
+            if (
+                typeof url === "string" &&
+                /^https?:\/\//i.test(url) &&
+                !media.images.some(
+                    image => image.replace(/^https?:\/\//i, "//") === identity
+                )
+            ) {
+                media.images.push(url)
+            }
+        }
+        addImage(item.thumb)
+        if (parsed.mediaContent) {
+            for (const content of parsed.mediaContent) {
+                if (content.$?.medium === "image") addImage(content.$.url)
+                if (
+                    content.$?.medium === "video" &&
+                    /^https?:\/\//i.test(content.$.url)
+                ) {
+                    media.videoUrl = content.$.url
+                }
+                if (content.$?.duration && !media.duration) {
+                    media.duration = parseDuration(content.$.duration)
+                }
+            }
+        }
+        if (parsed.enclosure?.url) {
+            if (parsed.enclosure.type?.startsWith("image/")) {
+                addImage(parsed.enclosure.url)
+            } else if (
+                parsed.enclosure.type?.startsWith("video/") &&
+                /^https?:\/\//i.test(parsed.enclosure.url)
+            ) {
+                media.videoUrl = parsed.enclosure.url
+            }
+        }
+        const contentDom = domParser.parseFromString(item.content, "text/html")
+        const base = contentDom.createElement("base")
+        base.setAttribute("href", item.link.split("/").slice(0, 3).join("/"))
+        contentDom.head.append(base)
+        for (const img of Array.from(contentDom.querySelectorAll("img"))) {
+            addImage(img.src)
+        }
+        if (parsed.videoDuration && !media.duration) {
+            media.duration = parseDuration(parsed.videoDuration)
+        }
+        if (!item.thumb) item.thumb = media.images[0]
+        item.media = JSON.stringify(media)
     }
+}
+
+function parseDuration(raw: string): number | undefined {
+    if (!/^\d+(?::\d+){0,2}$/.test(raw)) return undefined
+    const parts = raw.split(":").map(Number)
+    return parts.reduce((seconds, part) => seconds * 60 + part, 0)
 }
 
 export type ItemState = {
@@ -197,7 +275,9 @@ export function fetchItemsIntermediate(): ItemActionTypes {
 
 export async function insertItems(items: RSSItem[]): Promise<RSSItem[]> {
     items.sort((a, b) => a.date.getTime() - b.date.getTime())
-    const rows = items.map(item => db.items.createRow(item))
+    const rows = items.map(item =>
+        db.items.createRow({ ...item, media: item.media || "{}" })
+    )
     return (await db.itemsDB
         .insert()
         .into(db.items)

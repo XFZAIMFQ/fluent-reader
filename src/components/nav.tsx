@@ -6,39 +6,18 @@ import { Icon } from "@fluentui/react/lib/Icon"
 import { IObjectWithKey } from "@fluentui/react"
 import { RootState } from "../scripts/reducer"
 import { fetchItems, markAllRead } from "../scripts/models/item"
-import {
-    makeStyles,
-    mergeClasses,
-    ProgressBar,
-} from "@fluentui/react-components"
-import {
-    toggleMenu,
-    toggleLogMenu,
-    toggleSettings,
-    openViewMenu,
-    openMarkAllMenu,
-} from "../scripts/models/app"
+import { makeStyles, mergeClasses } from "@fluentui/react-components"
+import { toggleLogMenu, toggleSettings } from "../scripts/models/app"
 import { toggleSearch } from "../scripts/models/page"
-import { ViewType, WindowStateListenerType } from "../schema-types"
+import { SourceCategory, WindowStateListenerType } from "../schema-types"
 import { FlatButton } from "./utils/FlatButton"
 import { FlatButtonGroup } from "./utils/FlatButtonGroup"
-import { FlatButtonSeparator } from "./utils/FlatButtonSeparator"
-import { useIsWideScreen } from "./utils/hooks/useIsWideScreen"
 import {
     AppWindowFocusChangeEvent,
     useIsBlurred,
 } from "./utils/hooks/useIsBlurred"
 
 const useClasses = makeStyles({
-    progress: {
-        position: "fixed",
-        top: 0,
-        left: 0,
-        zIndex: 10,
-        width: "100%",
-        overflow: "hidden",
-        background: "none",
-    },
     navBlurred: {
         "--black": "var(--neutralSecondaryAlt)",
     },
@@ -58,9 +37,6 @@ const useClasses = makeStyles({
     navBtnMinimize: {
         fontSize: "12px",
     },
-    navGroupFirst: {
-        marginLeft: "72px",
-    },
     navGroupRight: {
         float: "right",
     },
@@ -72,14 +48,12 @@ const Nav: React.FC = () => {
     const state = useSelector((state: RootState) => state.app)
     const itemShown = useSelector(
         (state: RootState) =>
-            state.page.itemId && state.page.viewType !== ViewType.List
+            state.page.itemId &&
+            state.page.contentView !== "all" &&
+            state.page.contentView !== SourceCategory.Articles
     )
     const [maximized, setMaximized] = useState(globalThis.utils.isMaximized())
-    const isWideScreen = useIsWideScreen()
     const isBlurred = useIsBlurred()
-    const [isFullscreen, setIsFullscreen] = useState(() =>
-        globalThis.utils.isFullscreen()
-    )
     const isDarwin = globalThis.utils.platform === "darwin"
 
     const setBodyFullscreenState = useCallback((fullscreen: boolean) => {
@@ -94,7 +68,6 @@ const Nav: React.FC = () => {
                     setMaximized(windowState)
                     break
                 case WindowStateListenerType.Fullscreen:
-                    setIsFullscreen(windowState)
                     setBodyFullscreenState(windowState)
                     break
                 case WindowStateListenerType.Focused:
@@ -123,17 +96,24 @@ const Nav: React.FC = () => {
         if (canFetch()) dispatch(fetchItems())
     }, [canFetch, dispatch])
 
-    const menu = useCallback(() => dispatch(toggleMenu()), [dispatch])
+    const menu = useCallback(
+        () =>
+            document.querySelector<HTMLElement>(".modern-source-row")?.focus(),
+        []
+    )
     const logs = useCallback(() => dispatch(toggleLogMenu()), [dispatch])
     const search = useCallback(() => dispatch(toggleSearch()), [dispatch])
     const settings = useCallback(() => dispatch(toggleSettings()), [dispatch])
-    const markAll = useCallback(() => dispatch(openMarkAllMenu()), [dispatch])
     const markAllDirect = useCallback(() => dispatch(markAllRead()), [dispatch])
-    const views = useCallback(() => {
-        if (state.contextMenu.event !== "#view-toggle") {
-            dispatch(openViewMenu())
-        }
-    }, [state.contextMenu.event, dispatch])
+    const views = useCallback(
+        () =>
+            document
+                .querySelector<HTMLElement>(
+                    '.modern-tabs button[aria-selected="true"]'
+                )
+                ?.focus(),
+        []
+    )
 
     const navShortcutsHandler = useCallback(
         (e: KeyboardEvent | IObjectWithKey) => {
@@ -208,8 +188,6 @@ const Nav: React.FC = () => {
         globalThis.utils.closeWindow()
     }
 
-    const isFetching = !canFetch()
-
     const getClassNames = () => {
         const classNames = new Array<string>()
         if (state.settings.display) classNames.push("hide-btns")
@@ -219,94 +197,14 @@ const Nav: React.FC = () => {
         return classNames.join(" ")
     }
 
-    const getProgress = () => {
-        return state.fetchingTotal > 0
-            ? state.fetchingProgress / state.fetchingTotal
-            : undefined
-    }
-
-    const isNonNavButtonShown = !state.settings.display
-    const menuOn = state.menu
     const systemItemOnClass = itemShown ? classes.navBtnSystemItemOn : undefined
-    const firstGroupClass = mergeClasses(
-        isDarwin && !isFullscreen ? classes.navGroupFirst : undefined
-    )
 
     return (
         <nav className={getClassNames()}>
-            {(!isWideScreen || !menuOn) && isNonNavButtonShown && (
-                <FlatButtonGroup styleClass={firstGroupClass}>
-                    <FlatButton
-                        styleClass={classes.navBtn}
-                        title={intl.get("nav.menu")}
-                        onClick={menu}>
-                        <Icon
-                            iconName={
-                                isDarwin ? "SidePanel" : "GlobalNavButton"
-                            }
-                        />
-                    </FlatButton>
-                </FlatButtonGroup>
-            )}
             <span className="title">{state.title}</span>
             <FlatButtonGroup styleClass={classes.navGroupRight}>
-                {isNonNavButtonShown && (
-                    <>
-                        <FlatButton
-                            styleClass={classes.navBtn}
-                            fetching={isFetching}
-                            disabled={isFetching}
-                            onClick={fetch}
-                            title={intl.get("nav.refresh")}>
-                            <Icon iconName="Refresh" />
-                        </FlatButton>
-                        <FlatButton
-                            styleClass={classes.navBtn}
-                            id="mark-all-toggle"
-                            onClick={markAll}
-                            title={intl.get("nav.markAllRead")}
-                            onMouseDown={e => {
-                                if (
-                                    state.contextMenu.event ===
-                                    "#mark-all-toggle"
-                                )
-                                    e.stopPropagation()
-                            }}>
-                            <Icon iconName="InboxCheck" />
-                        </FlatButton>
-                        <FlatButton
-                            styleClass={classes.navBtn}
-                            id="log-toggle"
-                            title={intl.get("nav.notifications")}
-                            onClick={logs}>
-                            {state.logMenu.notify ? (
-                                <Icon iconName="RingerSolid" />
-                            ) : (
-                                <Icon iconName="Ringer" />
-                            )}
-                        </FlatButton>
-                        <FlatButton
-                            styleClass={classes.navBtn}
-                            id="view-toggle"
-                            title={intl.get("nav.view")}
-                            onClick={views}
-                            onMouseDown={e => {
-                                if (state.contextMenu.event === "#view-toggle")
-                                    e.stopPropagation()
-                            }}>
-                            <Icon iconName="View" />
-                        </FlatButton>
-                        <FlatButton
-                            styleClass={classes.navBtn}
-                            title={intl.get("nav.settings")}
-                            onClick={settings}>
-                            <Icon iconName="Settings" />
-                        </FlatButton>
-                    </>
-                )}
                 {!isDarwin && (
                     <>
-                        {!isDarwin && <FlatButtonSeparator />}
                         <FlatButton
                             variant="system"
                             styleClass={mergeClasses(
@@ -354,13 +252,6 @@ const Nav: React.FC = () => {
                     </>
                 )}
             </FlatButtonGroup>
-            {isFetching && (
-                <ProgressBar
-                    className={classes.progress}
-                    shape="square"
-                    value={getProgress()}
-                />
-            )}
         </nav>
     )
 }

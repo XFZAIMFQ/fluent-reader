@@ -12,7 +12,7 @@ import { getWindowBreakpoint, AppThunk, ActionStatus } from "../utils"
 import { RSSItem, markRead } from "./item"
 import { SourceActionTypes, DELETE_SOURCE } from "./source"
 import { toggleMenu } from "./app"
-import { ViewType, ViewConfigs } from "../../schema-types"
+import { ViewType, ViewConfigs, ContentView } from "../../schema-types"
 
 export const SELECT_PAGE = "SELECT_PAGE"
 export const SWITCH_VIEW = "SWITCH_VIEW"
@@ -22,6 +22,7 @@ export const SHOW_OFFSET_ITEM = "SHOW_OFFSET_ITEM"
 export const DISMISS_ITEM = "DISMISS_ITEM"
 export const APPLY_FILTER = "APPLY_FILTER"
 export const TOGGLE_SEARCH = "TOGGLE_SEARCH"
+export const SWITCH_CONTENT_VIEW = "SWITCH_CONTENT_VIEW"
 
 export enum PageType {
     AllArticles,
@@ -43,6 +44,11 @@ interface SelectPageAction {
 interface SwitchViewAction {
     type: typeof SWITCH_VIEW
     viewType: ViewType
+}
+
+interface SwitchContentViewAction {
+    type: typeof SWITCH_CONTENT_VIEW
+    contentView: ContentView
 }
 
 interface SetViewConfigsAction {
@@ -71,6 +77,7 @@ interface ToggleSearchAction {
 export type PageActionTypes =
     | SelectPageAction
     | SwitchViewAction
+    | SwitchContentViewAction
     | ShowItemAction
     | DismissItemAction
     | ApplyFilterAction
@@ -119,6 +126,13 @@ export function switchView(viewType: ViewType): AppThunk {
         })
     }
 }
+
+export const switchContentView = (
+    contentView: ContentView
+): PageActionTypes => ({
+    type: SWITCH_CONTENT_VIEW,
+    contentView,
+})
 
 export function setViewConfigs(configs: ViewConfigs): AppThunk {
     return (dispatch, getState) => {
@@ -273,6 +287,7 @@ export function performSearch(query: string): AppThunk {
 }
 
 export class PageState {
+    contentView: ContentView = "all"
     viewType = globalThis.settings.getDefaultView()
     viewConfigs = globalThis.settings.getViewConfigs(
         globalThis.settings.getDefaultView()
@@ -289,6 +304,8 @@ export function pageReducer(
     action: PageActionTypes | SourceActionTypes | FeedActionTypes
 ): PageState {
     switch (action.type) {
+        case SWITCH_CONTENT_VIEW:
+            return { ...state, contentView: action.contentView, itemId: null }
         case SELECT_PAGE:
             switch (action.pageType) {
                 case PageType.AllArticles:

@@ -3,8 +3,9 @@ import Datastore from "nedb"
 import lf from "lovefield"
 import { RSSSource } from "./models/source"
 import { RSSItem } from "./models/item"
+import { SourceCategory } from "../schema-types"
 
-const sdbSchema = lf.schema.create("sourcesDB", 3)
+const sdbSchema = lf.schema.create("sourcesDB", 4)
 sdbSchema
     .createTable("sources")
     .addColumn("sid", lf.Type.INTEGER)
@@ -19,10 +20,11 @@ sdbSchema
     .addColumn("rules", lf.Type.OBJECT)
     .addColumn("textDir", lf.Type.NUMBER)
     .addColumn("hidden", lf.Type.BOOLEAN)
+    .addColumn("category", lf.Type.STRING)
     .addNullable(["iconurl", "serviceRef", "rules"])
     .addIndex("idxURL", ["url"], true)
 
-const idbSchema = lf.schema.create("itemsDB", 1)
+const idbSchema = lf.schema.create("itemsDB", 2)
 idbSchema
     .createTable("items")
     .addColumn("_id", lf.Type.INTEGER)
@@ -41,6 +43,7 @@ idbSchema
     .addColumn("hidden", lf.Type.BOOLEAN)
     .addColumn("notify", lf.Type.BOOLEAN)
     .addColumn("serviceRef", lf.Type.STRING)
+    .addColumn("media", lf.Type.STRING)
     .addNullable(["thumb", "creator", "serviceRef"])
     .addIndex("idxDate", ["date"], false, lf.Order.DESC)
     .addIndex("idxService", ["serviceRef"], false)
@@ -58,12 +61,25 @@ async function onUpgradeSourceDB(rawDb: lf.raw.BackStore) {
     if (version < 3) {
         await rawDb.addTableColumn("sources", "hidden", false)
     }
+    if (version < 4) {
+        await rawDb.addTableColumn(
+            "sources",
+            "category",
+            SourceCategory.Articles
+        )
+    }
+}
+
+async function onUpgradeItemDB(rawDb: lf.raw.BackStore) {
+    if (rawDb.getVersion() < 2) {
+        await rawDb.addTableColumn("items", "media", "{}")
+    }
 }
 
 export async function init() {
     sourcesDB = await sdbSchema.connect({ onUpgrade: onUpgradeSourceDB })
     sources = sourcesDB.getSchema().table("sources")
-    itemsDB = await idbSchema.connect()
+    itemsDB = await idbSchema.connect({ onUpgrade: onUpgradeItemDB })
     items = itemsDB.getSchema().table("items")
     if (window.settings.getNeDBStatus()) {
         await migrateNeDB()
@@ -104,6 +120,7 @@ async function migrateNeDB() {
             if (!doc.fetchFrequency) doc.fetchFrequency = 0
             doc.textDir = 0
             doc.hidden = false
+            doc.category = SourceCategory.Articles
             return sources.createRow(doc)
         })
         const iRows = itemDocs.map(doc => {
@@ -116,6 +133,7 @@ async function migrateNeDB() {
             doc.starred = Boolean(doc.starred)
             doc.hidden = Boolean(doc.hidden)
             doc.notify = Boolean(doc.notify)
+            doc.media = "{}"
             return items.createRow(doc)
         })
         await Promise.all([

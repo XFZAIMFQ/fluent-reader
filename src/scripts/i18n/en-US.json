@@ -1,5 +1,15 @@
 {
     "allArticles": "All articles",
+    "status": { "unread": "unread" },
+    "articleSelectToRead": "Select an article to read",
+    "contentView": {
+        "all": "All",
+        "category": "Content type",
+        "articles": "Articles",
+        "social": "Social",
+        "pictures": "Pictures",
+        "videos": "Videos"
+    },
     "add": "Add",
     "create": "Create",
     "icon": "Icon",

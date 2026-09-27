@@ -20,6 +20,7 @@ import {
 import { saveSettings } from "./app"
 import { SourceRule } from "./rule"
 import { fixBrokenGroups } from "./group"
+import { ContentView, SourceCategory } from "../../schema-types"
 
 export const enum SourceOpenTarget {
     Local,
@@ -47,6 +48,7 @@ export class RSSSource {
     rules?: SourceRule[]
     textDir: SourceTextDirection
     hidden: boolean
+    category: SourceCategory
 
     constructor(url: string, name: string = null) {
         this.url = url
@@ -56,6 +58,7 @@ export class RSSSource {
         this.fetchFrequency = 60
         this.textDir = SourceTextDirection.LTR
         this.hidden = false
+        this.category = SourceCategory.Articles
     }
 
     static async fetchMetaData(source: RSSSource) {
@@ -120,6 +123,15 @@ export class RSSSource {
 
 export type SourceState = {
     [sid: number]: RSSSource
+}
+
+export function sourcesForContentView(
+    sources: SourceState,
+    view: ContentView
+): RSSSource[] {
+    return Object.values(sources).filter(
+        source => !source.hidden && (view === "all" || source.category === view)
+    )
 }
 
 export const INIT_SOURCES = "INIT_SOURCES"
@@ -301,13 +313,15 @@ export function insertSource(source: RSSSource): AppThunk<Promise<RSSSource>> {
 export function addSource(
     url: string,
     name: string = null,
-    batch = false
+    batch = false,
+    category = SourceCategory.Articles
 ): AppThunk<Promise<number>> {
     return async (dispatch, getState) => {
         const app = getState().app
         if (app.sourceInit) {
             dispatch(addSourceRequest(batch))
             const source = new RSSSource(url, name)
+            source.category = category
             try {
                 const feed = await RSSSource.fetchMetaData(source)
                 const inserted = await dispatch(insertSource(source))

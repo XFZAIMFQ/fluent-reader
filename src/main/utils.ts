@@ -1,11 +1,113 @@
-import { ipcMain, shell, dialog, app, session, clipboard } from "electron"
+import { ipcMain, shell, dialog, app, session, clipboard, net } from "electron"
 import { WindowManager } from "./window"
 import * as fs from "node:fs"
 import { ImageCallbackTypes, TouchBarTexts } from "../schema-types"
 import { initMainTouchBar } from "./touchbar"
 import * as fontList from "font-list"
 
+type FeedResponse = {
+    status: number
+    statusText: string
+    contentType: string
+    body: ArrayBuffer
+}
+
+function fetchFeed(url: string): Promise<FeedResponse> {
+    const firstUrl = new URL(url)
+    if (firstUrl.protocol !== "http:" && firstUrl.protocol !== "https:") {
+        throw new Error("Unsupported feed URL")
+    }
+    return new Promise((resolve, reject) => {
+        const maxBytes = 20 * 1024 * 1024
+        const request = net.request({
+            url: firstUrl.href,
+            credentials: "omit",
+            redirect: "manual",
+        })
+        let currentUrl = firstUrl
+        let redirects = 0
+        let settled = false
+        const fail = (error: Error) => {
+            if (settled) return
+            settled = true
+            clearTimeout(timer)
+            reject(error)
+        }
+        const timer = setTimeout(() => {
+            fail(new Error("Feed request timed out"))
+            request.abort()
+        }, 30000)
+
+        request.on("redirect", (_, __, redirectUrl) => {
+            try {
+                const nextUrl = new URL(redirectUrl, currentUrl)
+                if (
+                    redirects >= 5 ||
+                    (nextUrl.protocol !== "http:" &&
+                        nextUrl.protocol !== "https:")
+                ) {
+                    throw new Error("Unsupported feed redirect")
+                }
+                currentUrl = nextUrl
+                redirects += 1
+                request.followRedirect()
+            } catch (error) {
+                fail(error as Error)
+                request.abort()
+            }
+        })
+        request.on("response", response => {
+            const header = (value: string | string[]) =>
+                Array.isArray(value) ? value[0] || "" : value || ""
+            if (Number(header(response.headers["content-length"])) > maxBytes) {
+                fail(new Error("Feed exceeds 20 MB"))
+                request.abort()
+                return
+            }
+            const chunks: Buffer[] = []
+            let size = 0
+            response.on("data", chunk => {
+                size += chunk.byteLength
+                if (size > maxBytes) {
+                    fail(new Error("Feed exceeds 20 MB"))
+                    request.abort()
+                } else {
+                    chunks.push(chunk)
+                }
+            })
+            response.on("error", fail)
+            response.on("end", () => {
+                if (settled) return
+                settled = true
+                clearTimeout(timer)
+                const bytes = Buffer.concat(chunks)
+                resolve({
+                    status: response.statusCode,
+                    statusText: response.statusMessage,
+                    contentType: header(response.headers["content-type"]),
+                    body: bytes.buffer.slice(
+                        bytes.byteOffset,
+                        bytes.byteOffset + bytes.byteLength
+                    ),
+                })
+            })
+        })
+        request.on("error", fail)
+        request.end()
+    })
+}
+
 export function setUtilsListeners(manager: WindowManager) {
+    ipcMain.handle("fetch-feed", (event, url: string) => {
+        if (
+            !manager.hasWindow() ||
+            event.sender.id !== manager.mainWindow.webContents.id
+        ) {
+            throw new Error("Unauthorized feed request")
+        }
+        return fetchFeed(url)
+    })
+
     // Some sites reject Electron's default user agent.
     for (const webSession of [
         session.defaultSession,

@@ -29,6 +29,7 @@ const rssParser = new Parser({
             "image",
             ["content:encoded", "fullContent"],
             ["media:content", "mediaContent", { keepArray: true }],
+            ["itunes:duration", "videoDuration"],
         ],
     },
 })
@@ -74,16 +75,19 @@ export async function decodeFetchResponse(response: Response, isHTML = false) {
 }
 
 export async function parseRSS(url: string) {
-    let result: Response
+    let result: Awaited<ReturnType<typeof window.utils.fetchFeed>>
     try {
-        result = await fetch(url, { credentials: "omit" })
+        result = await window.utils.fetchFeed(url)
     } catch {
         throw new Error(intl.get("log.networkError"))
     }
-    if (result && result.ok) {
+    if (result && result.status >= 200 && result.status < 300) {
         try {
+            const response = new Response(result.body, {
+                headers: { "content-type": result.contentType },
+            })
             return await rssParser.parseString(
-                await decodeFetchResponse(result)
+                await decodeFetchResponse(response)
             )
         } catch {
             throw new Error(intl.get("log.parseError"))

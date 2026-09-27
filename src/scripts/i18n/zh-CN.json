@@ -1,5 +1,15 @@
 {
     "allArticles": "全部文章",
+    "status": { "unread": "未读" },
+    "articleSelectToRead": "选择一篇文章开始阅读",
+    "contentView": {
+        "all": "全部",
+        "category": "内容类型",
+        "articles": "文章",
+        "social": "社交媒体",
+        "pictures": "图片",
+        "videos": "视频"
+    },
     "add": "添加",
     "create": "新建",
     "icon": "图标",

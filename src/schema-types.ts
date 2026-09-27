@@ -26,6 +26,15 @@ export const enum ViewType {
     Customized,
 }
 
+export const enum SourceCategory {
+    Articles = "articles",
+    Social = "social",
+    Pictures = "pictures",
+    Videos = "videos",
+}
+
+export type ContentView = "all" | SourceCategory
+
 export const enum ViewConfigs {
     ShowCover = 1 << 0,
     ShowSnippet = 1 << 1,

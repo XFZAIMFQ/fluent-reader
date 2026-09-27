@@ -7,7 +7,7 @@ import {
     RSSSource,
     SourceState,
 } from "./source"
-import { SourceGroup } from "../../schema-types"
+import { SourceCategory, SourceGroup } from "../../schema-types"
 import { ActionStatus, AppThunk, domParser } from "../utils"
 import { saveSettings } from "./app"
 import {
@@ -223,7 +223,16 @@ function outlineToSource(
     let url = outline.getAttribute("xmlUrl")
     let name = outline.getAttribute("text") || outline.getAttribute("title")
     if (url) {
-        return [addSource(url.trim(), name, true), url]
+        const category = outline.getAttribute("fluentReaderCategory")
+        const selectedCategory = [
+            SourceCategory.Articles,
+            SourceCategory.Social,
+            SourceCategory.Pictures,
+            SourceCategory.Videos,
+        ].includes(category as SourceCategory)
+            ? (category as SourceCategory)
+            : SourceCategory.Articles
+        return [addSource(url.trim(), name, true, selectedCategory), url]
     } else {
         return null
     }
@@ -316,6 +325,7 @@ function sourceToOutline(source: RSSSource, xml: Document) {
     outline.setAttribute("title", source.name)
     outline.setAttribute("type", "rss")
     outline.setAttribute("xmlUrl", source.url)
+    outline.setAttribute("fluentReaderCategory", source.category)
     return outline
 }
 

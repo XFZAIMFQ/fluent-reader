@@ -3,6 +3,7 @@ import { closeContextMenu } from "../scripts/models/app"
 import Page from "./page"
 import { Menu } from "./menu"
 import Nav from "./nav"
+import StatusBar from "./status-bar"
 import Settings from "./settings"
 import { useAppDispatch, useAppSelector } from "../scripts/reducer"
 import { ContextMenu } from "./context-menu"
@@ -53,9 +54,12 @@ const Root: React.FC = () => {
                             key={locale}
                             onMouseDown={() => dispatch(closeContextMenu())}>
                             <Nav />
-                            <Page />
+                            <div className="modern-workspace">
+                                <Menu />
+                                <Page />
+                            </div>
+                            <StatusBar />
                             <LogMenu />
-                            <Menu />
                             <Settings />
                             <ContextMenu />
                         </div>

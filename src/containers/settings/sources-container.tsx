@@ -15,7 +15,7 @@ import {
 import { importOPML, exportOPML } from "../../scripts/models/group"
 import { AppDispatch, validateFavicon } from "../../scripts/utils"
 import { saveSettings, toggleSettings } from "../../scripts/models/app"
-import { SyncService } from "../../schema-types"
+import { SourceCategory, SyncService } from "../../schema-types"
 
 const getSources = (state: RootState) => state.sources
 const getServiceOn = (state: RootState) =>
@@ -34,7 +34,11 @@ const mapStateToProps = createSelector(
 const mapDispatchToProps = (dispatch: AppDispatch) => {
     return {
         acknowledgeSIDs: () => dispatch(toggleSettings(true)),
-        addSource: (url: string) => dispatch(addSource(url)),
+        addSource: (url: string, category: SourceCategory) =>
+            dispatch(addSource(url, null, false, category)),
+        updateSourceCategory: (source: RSSSource, category: SourceCategory) => {
+            dispatch(updateSource({ ...source, category }))
+        },
         updateSourceName: (source: RSSSource, name: string) => {
             dispatch(updateSource({ ...source, name: name } as RSSSource))
         },

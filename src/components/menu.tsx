@@ -1,547 +1,386 @@
 import * as React from "react"
-import { useMemo, useCallback, useEffect, useRef, useState } from "react"
+import { useState } from "react"
 import intl from "react-intl-universal"
-import { SourceGroup, ViewType } from "../schema-types"
-import { RSSSource } from "../scripts/models/source"
-import { ALL, initFeeds } from "../scripts/models/feed"
-import { useAppSelector, useAppDispatch } from "../scripts/reducer"
-import { toggleMenu, openGroupMenu } from "../scripts/models/app"
+import { Icon } from "@fluentui/react"
+import {
+    Apps24Regular,
+    Chat24Regular,
+    DocumentText24Regular,
+    Image24Regular,
+    Video24Regular,
+} from "@fluentui/react-icons"
+import { ContentView, SourceCategory } from "../schema-types"
+import { addSource, RSSSource } from "../scripts/models/source"
+import { initFeeds } from "../scripts/models/feed"
+import { useAppDispatch, useAppSelector } from "../scripts/reducer"
+import { openGroupMenu, toggleSettings } from "../scripts/models/app"
 import { toggleGroupExpansion } from "../scripts/models/group"
 import {
     selectAllArticles,
     selectSources,
-    toggleSearch,
+    switchContentView,
 } from "../scripts/models/page"
-import {
-    makeStyles,
-    mergeClasses,
-    ToggleButton,
-    tokens,
-    Tree,
-    TreeItem,
-    TreeItemLayout,
-    TreeOpenChangeData,
-    useSubtreeContext_unstable,
-} from "@fluentui/react-components"
-import { useFocusFinders } from "@fluentui/react-tabster"
-import {
-    Checkmark16Regular,
-    DocumentOnePageMultiple16Regular,
-    Filter12Filled,
-    Search16Regular,
-} from "@fluentui/react-icons"
-import { FlatButton } from "./utils/FlatButton"
-import { FlatButtonGroup } from "./utils/FlatButtonGroup"
-import { useIsWideScreen } from "./utils/hooks/useIsWideScreen"
-import { useIsBlurred } from "./utils/hooks/useIsBlurred"
-import { Icon } from "@fluentui/react"
-import { StackShim } from "@fluentui/react-migration-v8-v9"
 
-const useMenuClasses = makeStyles({
-    menuBtn: {
-        height: "var(--navHeight)",
-        lineHeight: "var(--navHeight)",
-    },
-    menuBtnBlurred: {
-        color: "var(--neutralSecondaryAlt)",
-    },
-    menuGroupDarwin: {
-        display: "flex",
-        flexDirection: "row-reverse",
-    },
-    menuContainer: {
-        "position": "fixed",
-        "zIndex": 5,
-        "left": 0,
-        "top": 0,
-        "width": "100%",
-        "height": "100%",
-        "pointerEvents": "none",
-        "@media (min-width: 1440px)": {
-            width: "280px !important",
-            background: "none",
-            backdropFilter: "none",
-        },
-    },
-    menuContainerShow: {
-        pointerEvents: "unset",
-    },
-    menuInner: {
-        "position": "absolute",
-        "left": 0,
-        "top": 0,
-        "width": "280px",
-        "height": "100%",
-        "backgroundColor": "var(--neutralLighterAltOpacity)",
-        "backdropFilter": "var(--blur)",
-        "boxShadow": "5px 0 25px #0004",
-        "transition":
-            "clip-path var(--transition-timing) 0.367s, opacity cubic-bezier(0, 0, 0.2, 1) 0.367s",
-        "clipPath": "inset(0 100% 0 0)",
-        "opacity": 0,
-        "@media (min-width: 1440px)": {
-            "backgroundColor": "var(--neutralLight)",
-            "boxShadow": "none",
-            "::after": {
-                content: '""',
-                display: "block",
-                pointerEvents: "none",
-                position: "absolute",
-                top: "-10%",
-                right: 0,
-                width: "120%",
-                height: "120%",
-                boxShadow: "inset 5px 0 25px #0004",
-            },
-        },
-    },
-    menuInnerShow: {
-        "clipPath": "inset(0 -50px 0 0)",
-        "opacity": 1,
-        "@media (min-width: 1440px)": {
-            clipPath: "inset(0)",
-        },
-    },
-    menuInnerDarwin: {
-        "@media (min-width: 1440px)": {
-            background: "none",
-        },
-    },
-    menuInnerItemOnDarwin: {
-        "@media (min-width: 1440px)": {
-            backgroundColor: "var(--neutralLight)",
-        },
-    },
-    navWrapper: {
-        maxHeight: "calc(100% - var(--navHeight))",
-        overflowX: "hidden",
-        overflowY: "auto",
-    },
-    tree: {
-        paddingTop: 0,
-        paddingBottom: 0,
-    },
-    subsHeaderStack: {
-        marginTop: "16px",
-        marginBottom: "4px",
-        marginLeft: "8px",
-        marginRight: "8px",
-    },
-    subsHeader: {
-        fontSize: "12px",
-        color: tokens.colorNeutralForeground4,
-        userSelect: "none",
-    },
-    favicon: {
-        width: "16px",
-        height: "16px",
-        verticalAlign: "middle",
-        userSelect: "none",
-    },
-    primaryIcon: {
-        color: tokens.colorCompoundBrandForeground1,
-    },
-})
+const views: ContentView[] = [
+    "all",
+    SourceCategory.Articles,
+    SourceCategory.Social,
+    SourceCategory.Pictures,
+    SourceCategory.Videos,
+]
+
+const viewIcons = {
+    all: Apps24Regular,
+    articles: DocumentText24Regular,
+    social: Chat24Regular,
+    pictures: Image24Regular,
+    videos: Video24Regular,
+}
+
+const fallbackLabels: Record<ContentView, string> = {
+    all: "All articles",
+    articles: "Articles",
+    social: "Social",
+    pictures: "Pictures",
+    videos: "Videos",
+}
+
+const label = (view: ContentView) =>
+    view === "all"
+        ? intl.get("allArticles") || fallbackLabels.all
+        : intl.get(`contentView.${view}`) || fallbackLabels[view]
 
 export const Menu: React.FC = () => {
     const dispatch = useAppDispatch()
-    const menuClasses = useMenuClasses()
-    const { findFirstFocusable } = useFocusFinders()
-    const isWideScreen = useIsWideScreen()
-    const isDarwin = globalThis.utils.platform === "darwin"
-    const isBlurred = useIsBlurred()
-
-    const status = useAppSelector(
-        s => s.app.sourceInit && !s.app.settings.display
-    )
-    const display = useAppSelector(s => s.app.menu)
-    const selected = useAppSelector(s => s.app.menuKey)
+    const ready = useAppSelector(s => s.app.sourceInit)
+    const settingsOn = useAppSelector(s => s.app.settings.display)
     const sources = useAppSelector(s => s.sources)
-    const rawGroups = useAppSelector(s => s.groups)
-    const groups = useMemo(
-        () => rawGroups.map((g, i) => ({ ...g, index: i })),
-        [rawGroups]
-    )
-    const searchOn = useAppSelector(s => s.page.searchOn)
-    const itemOn = useAppSelector(
-        s => s.page.itemId !== null && s.page.viewType !== ViewType.List
-    )
+    const groups = useAppSelector(s => s.groups)
+    const selected = useAppSelector(s => s.app.menuKey)
+    const view = useAppSelector(s => s.page.contentView)
+    const [adding, setAdding] = useState(false)
+    const [url, setUrl] = useState("")
+    const [category, setCategory] = useState(SourceCategory.Articles)
+    const [submitting, setSubmitting] = useState(false)
 
-    const openItems = useMemo(
-        () =>
-            new Set(
-                groups
-                    .filter(g => g.isMultiple && g.expanded)
-                    .map(g => "g-" + g.index)
-            ),
-        [groups]
+    const visible = Object.values(sources).filter(
+        source =>
+            !source.hidden &&
+            (view === "all" ||
+                (source.category || SourceCategory.Articles) === view)
     )
+    const visibleIds = new Set(visible.map(source => source.sid))
+    const unread = visible.reduce(
+        (total, source) => total + source.unreadCount,
+        0
+    )
+    const unreadByView = (tab: ContentView) =>
+        Object.values(sources)
+            .filter(
+                source =>
+                    !source.hidden &&
+                    (tab === "all" ||
+                        (source.category || SourceCategory.Articles) === tab)
+            )
+            .reduce((total, source) => total + source.unreadCount, 0)
 
-    const handleToggleMenu = useCallback(() => dispatch(toggleMenu()), [])
-    const handleToggleSearch = useCallback(() => dispatch(toggleSearch()), [])
-    const handleAllArticles = useCallback((init = false) => {
-        dispatch(selectAllArticles(init))
-        dispatch(initFeeds())
-    }, [])
-    const handleSelectSourceGroup = useCallback(
-        (group: SourceGroup, menuKey: string) => {
-            dispatch(selectSources(group.sids, menuKey, group.name))
-            dispatch(initFeeds())
-        },
-        []
-    )
-    const handleSelectSource = useCallback((source: RSSSource) => {
-        dispatch(selectSources([source.sid], "s-" + source.sid, source.name))
-        dispatch(initFeeds())
-    }, [])
-    const handleGroupContextMenu = useCallback(
-        (sids: number[], event: React.MouseEvent) => {
-            dispatch(openGroupMenu(sids, event))
-        },
-        []
-    )
-
-    const handleOpenChange = useCallback(
-        (_event: any, data: TreeOpenChangeData) => {
-            if (
-                data.type === "ExpandIconClick" ||
-                data.type === "ArrowRight" ||
-                data.type === "ArrowLeft"
-            ) {
-                const value = String(data.value)
-                if (value.startsWith("g-")) {
-                    const index = Number.parseInt(value.split("-")[1])
-                    dispatch(toggleGroupExpansion(index))
-                }
-            }
-        },
-        []
-    )
-
-    const [isUnreadSourcesOnly, setIsUnreadSourcesOnly] = useState(() =>
-        globalThis.settings.getUnreadSourcesOnly()
-    )
-
-    const totalUnread = useMemo(
-        () =>
-            Object.values(sources)
-                .filter(s => !s.hidden)
-                .map(s => s.unreadCount)
-                .reduce((a, b) => a + b, 0),
-        [sources]
-    )
-
-    const treeRef = useRef<HTMLDivElement>(null)
-    const previousDisplayRef = useRef(display)
-    useEffect(() => {
-        if (display && !previousDisplayRef.current) {
-            findFirstFocusable(treeRef.current)?.focus()
+    const selectView = (next: ContentView) => {
+        dispatch(switchContentView(next))
+        if (next === "all") {
+            dispatch(selectAllArticles())
+        } else {
+            const sids = Object.values(sources)
+                .filter(
+                    source =>
+                        !source.hidden &&
+                        (source.category || SourceCategory.Articles) === next
+                )
+                .map(source => source.sid)
+            dispatch(selectSources(sids, `category-${next}`, label(next)))
         }
-        previousDisplayRef.current = display
-    }, [display])
-
-    const renderSourceItem = (s: RSSSource) => {
-        const key = "s-" + s.sid
-        return (
-            <MenuTreeItem
-                key={key}
-                value={key}
-                label={s.name}
-                isSelected={selected === key}
-                icon={
-                    s.iconurl ? (
-                        <img
-                            alt=""
-                            className={menuClasses.favicon}
-                            src={s.iconurl}
-                        />
-                    ) : undefined
-                }
-                unreadCount={s.unreadCount}
-                onClick={() => handleSelectSource(s)}
-                onContextMenu={e => {
-                    handleGroupContextMenu([s.sid], e)
-                }}
-            />
-        )
+        dispatch(initFeeds())
     }
 
+    const selectSource = (source: RSSSource) => {
+        dispatch(selectSources([source.sid], `s-${source.sid}`, source.name))
+        dispatch(initFeeds())
+    }
+
+    const submitSource = async (event: React.FormEvent) => {
+        event.preventDefault()
+        if (!url.trim() || submitting) return
+        setSubmitting(true)
+        try {
+            const sid = await dispatch(
+                addSource(url.trim(), null, false, category)
+            )
+            dispatch(switchContentView(category))
+            const categorySources = Object.values(sources)
+                .filter(
+                    source =>
+                        !source.hidden &&
+                        (source.category || SourceCategory.Articles) ===
+                            category
+                )
+                .map(source => source.sid)
+            dispatch(
+                selectSources(
+                    [...categorySources, sid],
+                    `category-${category}`,
+                    label(category)
+                )
+            )
+            dispatch(initFeeds())
+            setAdding(false)
+            setUrl("")
+        } catch {
+            // addSource displays the error to the user.
+        } finally {
+            setSubmitting(false)
+        }
+    }
+
+    if (!ready || settingsOn) return null
+
     return (
-        status && (
-            <div
-                className={mergeClasses(
-                    menuClasses.menuContainer,
-                    display && menuClasses.menuContainerShow
-                )}
-                onClick={handleToggleMenu}>
-                <div
-                    className={mergeClasses(
-                        menuClasses.menuInner,
-                        display && menuClasses.menuInnerShow,
-                        isDarwin && menuClasses.menuInnerDarwin,
-                        isDarwin && itemOn && menuClasses.menuInnerItemOnDarwin
-                    )}
-                    onClick={e => e.stopPropagation()}>
-                    <FlatButtonGroup
-                        styleClass={
-                            isDarwin ? menuClasses.menuGroupDarwin : undefined
-                        }>
-                        <FlatButton
-                            styleClass={mergeClasses(
-                                menuClasses.menuBtn,
-                                isBlurred
-                                    ? menuClasses.menuBtnBlurred
-                                    : undefined
-                            )}
-                            title={intl.get("menu.close")}
-                            ariaLabel={intl.get("menu.close")}
-                            onClick={handleToggleMenu}>
-                            {isWideScreen ? (
-                                <Icon
-                                    iconName={
-                                        isDarwin
-                                            ? "SidePanel"
-                                            : "GlobalNavButton"
-                                    }
-                                />
-                            ) : (
-                                <Icon iconName="Back" />
-                            )}
-                        </FlatButton>
-                    </FlatButtonGroup>
-                    <div className={menuClasses.navWrapper}>
-                        <Tree
-                            ref={treeRef}
-                            className={menuClasses.tree}
-                            size="small"
-                            appearance="subtle-alpha"
-                            openItems={openItems}
-                            onOpenChange={handleOpenChange}>
-                            <MenuTreeItem
-                                value="search"
-                                label={intl.get("search")}
-                                icon={
-                                    <Search16Regular
-                                        className={menuClasses.primaryIcon}
-                                    />
-                                }
-                                aside={
-                                    searchOn ? (
-                                        <Checkmark16Regular
-                                            className={menuClasses.primaryIcon}
-                                        />
-                                    ) : undefined
-                                }
-                                onClick={handleToggleSearch}
-                            />
-                            <MenuTreeItem
-                                value={ALL}
-                                label={intl.get("allArticles")}
-                                isSelected={selected === ALL}
-                                icon={
-                                    <DocumentOnePageMultiple16Regular
-                                        className={menuClasses.primaryIcon}
-                                    />
-                                }
-                                unreadCount={totalUnread}
-                                onClick={() =>
-                                    handleAllArticles(selected !== ALL)
-                                }
-                            />
-                            {groups.length > 0 && (
-                                <StackShim
-                                    horizontal
-                                    horizontalAlign="space-between"
-                                    verticalAlign="center"
-                                    className={menuClasses.subsHeaderStack}>
-                                    <span className={menuClasses.subsHeader}>
-                                        {intl.get("menu.subscriptions")}
-                                    </span>
-                                    <ToggleButton
-                                        aria-label={
-                                            isUnreadSourcesOnly
-                                                ? intl.get("context.unreadOnly")
-                                                : intl.get("allArticles")
-                                        }
-                                        checked={isUnreadSourcesOnly}
-                                        onClick={() => {
-                                            setIsUnreadSourcesOnly(value => {
-                                                globalThis.settings.setUnreadSourcesOnly(
-                                                    !value
-                                                )
-                                                return !value
-                                            })
-                                        }}
-                                        size="small"
-                                        appearance="transparent"
-                                        icon={<Filter12Filled />}>
-                                        {isUnreadSourcesOnly &&
-                                            intl.get("context.unreadOnly")}
-                                    </ToggleButton>
-                                </StackShim>
-                            )}
-                            {groups
-                                .filter(g => {
-                                    if (g.sids.length === 0) return false
-                                    if (!isUnreadSourcesOnly) return true
-                                    return g.sids.some(
-                                        sid => sources[sid]?.unreadCount > 0
-                                    )
-                                })
-                                .map(g => {
-                                    if (g.isMultiple) {
-                                        const groupSources = g.sids.map(
-                                            sid => sources[sid]
-                                        )
-                                        const groupKey = "g-" + g.index
-                                        const isGroupSelected =
-                                            selected === groupKey
-                                        const groupUnread = groupSources
-                                            .map(s => s.unreadCount)
-                                            .reduce((a, b) => a + b, 0)
-                                        const visibleGroupSources =
-                                            isUnreadSourcesOnly
-                                                ? groupSources.filter(
-                                                      s => s.unreadCount > 0
-                                                  )
-                                                : groupSources
-                                        return (
-                                            <MenuTreeItem
-                                                key={groupKey}
-                                                value={groupKey}
-                                                itemType="branch"
-                                                label={g.name}
-                                                isSelected={isGroupSelected}
-                                                unreadCount={groupUnread}
-                                                onClick={() =>
-                                                    handleSelectSourceGroup(
-                                                        g,
-                                                        groupKey
-                                                    )
-                                                }
-                                                onContextMenu={e =>
-                                                    handleGroupContextMenu(
-                                                        g.sids,
-                                                        e
-                                                    )
-                                                }>
-                                                <Tree>
-                                                    {visibleGroupSources.map(
-                                                        renderSourceItem
-                                                    )}
-                                                </Tree>
-                                            </MenuTreeItem>
-                                        )
-                                    } else {
-                                        return renderSourceItem(
-                                            sources[g.sids[0]]
-                                        )
-                                    }
-                                })}
-                        </Tree>
-                    </div>
+        <aside
+            className="modern-sidebar"
+            aria-label={intl.get("menu.subscriptions")}>
+            <div className="modern-sidebar-heading">
+                <div className="modern-brand">
+                    <img src="icons/logo.svg" alt="" />
+                    <strong>Fluent Reader</strong>
+                </div>
+                <div className="modern-sidebar-actions">
+                    <button
+                        type="button"
+                        className="modern-add-button"
+                        aria-label={intl.get("add")}
+                        title={intl.get("add")}
+                        onClick={() => {
+                            setCategory(
+                                view === "all" ? SourceCategory.Articles : view
+                            )
+                            setAdding(true)
+                        }}>
+                        +
+                    </button>
+                    <button
+                        type="button"
+                        aria-label={intl.get("nav.settings")}
+                        title={intl.get("nav.settings")}
+                        onClick={() => dispatch(toggleSettings())}>
+                        <Icon iconName="Settings" />
+                    </button>
                 </div>
             </div>
-        )
-    )
-}
-
-const useTreeItemClasses = makeStyles({
-    treeItem: {
-        minHeight: "32px",
-    },
-    treeLeafItem: {
-        paddingLeft: "12px",
-    },
-    treeLeafSubItem: {
-        paddingLeft: "24px",
-    },
-    selectedItem: {
-        "::after": {
-            content: '""',
-            position: "absolute",
-            left: 0,
-            top: "4px",
-            width: "4px",
-            height: "24px",
-            borderRadius: tokens.borderRadiusCircular,
-            backgroundColor: tokens.colorCompoundBrandForeground1,
-        },
-    },
-    selectedItemText: {
-        color: tokens.colorNeutralForeground1,
-        fontWeight: tokens.fontWeightSemibold,
-    },
-    unreadCount: {
-        color: tokens.colorNeutralForeground3,
-        marginLeft: "auto",
-        paddingLeft: "4px",
-        flexShrink: 0,
-    },
-})
-
-interface MenuTreeItemProps {
-    value: string
-    itemType?: "leaf" | "branch"
-    label: string
-    isSelected?: boolean
-    icon?: React.ReactElement
-    unreadCount?: number
-    aside?: React.ReactElement
-    onClick: () => void
-    onContextMenu?: (e: React.MouseEvent) => void
-    children?: React.ReactNode
-}
-
-const MenuTreeItem: React.FC<MenuTreeItemProps> = ({
-    value,
-    itemType = "leaf",
-    label,
-    isSelected = false,
-    icon,
-    unreadCount,
-    aside,
-    onClick,
-    onContextMenu,
-    children,
-}) => {
-    const c = useTreeItemClasses()
-    const { level } = useSubtreeContext_unstable()
-    let resolvedAside: React.ReactElement | undefined = aside
-    if (resolvedAside === undefined && unreadCount && unreadCount > 0) {
-        resolvedAside = (
-            <span className={c.unreadCount}>
-                {unreadCount >= 1000 ? "999+" : String(unreadCount)}
-            </span>
-        )
-    }
-    const handleContextMenu = onContextMenu
-        ? (e: React.MouseEvent) => {
-              e.stopPropagation()
-              onContextMenu(e)
-          }
-        : undefined
-    return (
-        <TreeItem
-            value={value}
-            itemType={itemType}
-            onClick={onClick}
-            onContextMenu={handleContextMenu}>
-            <TreeItemLayout
-                aria-label={`${isSelected ? "Selected: " : ""}${label}`}
-                className={mergeClasses(
-                    c.treeItem,
-                    itemType === "leaf" && c.treeLeafItem,
-                    level > 1 && c.treeLeafSubItem,
-                    isSelected && c.selectedItem
+            <div className="modern-tabs" role="tablist">
+                {views.map(tab => (
+                    <button
+                        key={tab}
+                        type="button"
+                        role="tab"
+                        aria-label={label(tab)}
+                        title={label(tab)}
+                        data-view={tab}
+                        aria-selected={view === tab}
+                        className={view === tab ? "active" : ""}
+                        onClick={() => selectView(tab)}
+                        onKeyDown={event => {
+                            if (
+                                event.key !== "ArrowLeft" &&
+                                event.key !== "ArrowRight"
+                            )
+                                return
+                            event.preventDefault()
+                            const direction =
+                                event.key === "ArrowRight" ? 1 : -1
+                            const next =
+                                (views.indexOf(tab) +
+                                    direction +
+                                    views.length) %
+                                views.length
+                            selectView(views[next])
+                            event.currentTarget.parentElement
+                                .querySelectorAll<HTMLButtonElement>("button")
+                                [next].focus()
+                        }}>
+                        {React.createElement(viewIcons[tab])}
+                        <small>{unreadByView(tab)}</small>
+                    </button>
+                ))}
+            </div>
+            <div className="modern-sidebar-list">
+                <button
+                    type="button"
+                    className={`modern-source-row ${
+                        selected === "ALL" || selected === `category-${view}`
+                            ? "active"
+                            : ""
+                    }`}
+                    onClick={() => selectView(view)}>
+                    <span className="modern-source-icon">◫</span>
+                    <span className="modern-source-name">{label(view)}</span>
+                    {unread > 0 && <small>{unread}</small>}
+                </button>
+                <div className="modern-sidebar-section">
+                    {intl.get("menu.subscriptions")}
+                </div>
+                {groups.map((group, index) => {
+                    const members = group.sids
+                        .filter(sid => visibleIds.has(sid))
+                        .map(sid => sources[sid])
+                    if (!members.length) return null
+                    if (!group.isMultiple) {
+                        const source = members[0]
+                        return (
+                            <SourceRow
+                                key={source.sid}
+                                source={source}
+                                active={selected === `s-${source.sid}`}
+                                onClick={() => selectSource(source)}
+                                onContextMenu={event =>
+                                    dispatch(openGroupMenu([source.sid], event))
+                                }
+                            />
+                        )
+                    }
+                    return (
+                        <div key={index}>
+                            <div className="modern-source-row modern-group-row">
+                                <button
+                                    type="button"
+                                    aria-label={
+                                        group.expanded ? "Collapse" : "Expand"
+                                    }
+                                    onClick={() =>
+                                        dispatch(toggleGroupExpansion(index))
+                                    }>
+                                    {group.expanded ? "⌄" : "›"}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        dispatch(
+                                            selectSources(
+                                                members.map(s => s.sid),
+                                                `g-${index}`,
+                                                group.name
+                                            )
+                                        )
+                                        dispatch(initFeeds())
+                                    }}
+                                    onContextMenu={event =>
+                                        dispatch(
+                                            openGroupMenu(
+                                                members.map(s => s.sid),
+                                                event
+                                            )
+                                        )
+                                    }>
+                                    {group.name}
+                                </button>
+                            </div>
+                            {group.expanded &&
+                                members.map(source => (
+                                    <SourceRow
+                                        key={source.sid}
+                                        source={source}
+                                        active={selected === `s-${source.sid}`}
+                                        nested
+                                        onClick={() => selectSource(source)}
+                                        onContextMenu={event =>
+                                            dispatch(
+                                                openGroupMenu(
+                                                    [source.sid],
+                                                    event
+                                                )
+                                            )
+                                        }
+                                    />
+                                ))}
+                        </div>
+                    )
+                })}
+                {!visible.length && (
+                    <p className="modern-sidebar-empty">
+                        {intl.get("article.empty")}
+                    </p>
                 )}
-                iconBefore={icon}
-                aside={resolvedAside}>
-                <span className={isSelected ? c.selectedItemText : undefined}>
-                    {label}
-                </span>
-            </TreeItemLayout>
-            {children}
-        </TreeItem>
+            </div>
+            {adding && (
+                <div
+                    className="modern-dialog-backdrop"
+                    onMouseDown={() => setAdding(false)}>
+                    <form
+                        className="modern-add-dialog"
+                        onMouseDown={event => event.stopPropagation()}
+                        onSubmit={submitSource}>
+                        <h2>{intl.get("sources.add")}</h2>
+                        <label htmlFor="modern-source-url">URL</label>
+                        <input
+                            id="modern-source-url"
+                            type="url"
+                            required
+                            autoFocus
+                            value={url}
+                            onChange={event => setUrl(event.target.value)}
+                            placeholder="http://localhost:1200/..."
+                        />
+                        <label htmlFor="modern-source-category">
+                            {intl.get("contentView.category")}
+                        </label>
+                        <select
+                            id="modern-source-category"
+                            value={category}
+                            onChange={event =>
+                                setCategory(
+                                    event.target.value as SourceCategory
+                                )
+                            }>
+                            {views.slice(1).map(option => (
+                                <option key={option} value={option}>
+                                    {label(option)}
+                                </option>
+                            ))}
+                        </select>
+                        <div className="modern-dialog-actions">
+                            <button
+                                type="button"
+                                onClick={() => setAdding(false)}>
+                                {intl.get("cancel")}
+                            </button>
+                            <button type="submit" disabled={submitting}>
+                                {intl.get("add")}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
+        </aside>
     )
 }
+
+const SourceRow: React.FC<{
+    source: RSSSource
+    active: boolean
+    nested?: boolean
+    onClick: () => void
+    onContextMenu: (event: React.MouseEvent) => void
+}> = ({ source, active, nested, onClick, onContextMenu }) => (
+    <button
+        type="button"
+        className={`modern-source-row ${active ? "active" : ""} ${
+            nested ? "nested" : ""
+        }`}
+        onClick={onClick}
+        onContextMenu={onContextMenu}>
+        {source.iconurl ? (
+            <img className="modern-source-icon" src={source.iconurl} alt="" />
+        ) : (
+            <span className="modern-source-icon">◫</span>
+        )}
+        <span className="modern-source-name">{source.name}</span>
+        {source.unreadCount > 0 && <small>{source.unreadCount}</small>}
+    </button>
+)

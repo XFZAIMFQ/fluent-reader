@@ -24,13 +24,15 @@ import {
 } from "../../scripts/models/source"
 import { urlTest } from "../../scripts/utils"
 import DangerButton from "../utils/danger-button"
+import { SourceCategory } from "../../schema-types"
 
 type SourcesTabProps = {
     sources: SourceState
     serviceOn: boolean
     sids: number[]
     acknowledgeSIDs: () => void
-    addSource: (url: string) => void
+    addSource: (url: string, category: SourceCategory) => void
+    updateSourceCategory: (source: RSSSource, category: SourceCategory) => void
     updateSourceName: (source: RSSSource, name: string) => void
     updateSourceIcon: (source: RSSSource, iconUrl: string) => Promise<void>
     updateSourceOpenTarget: (
@@ -65,6 +67,7 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
         super(props)
         this.state = {
             newUrl: "",
+            newCategory: SourceCategory.Articles,
             newSourceName: "",
             selectedSource: null,
             selectedSources: null,
@@ -131,6 +134,25 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
         { key: EditDropdownKeys.Url, text: "URL" },
     ]
 
+    categoryOptions = (): IDropdownOption[] => [
+        {
+            key: SourceCategory.Articles,
+            text: intl.get("contentView.articles"),
+        },
+        {
+            key: SourceCategory.Social,
+            text: intl.get("contentView.social"),
+        },
+        {
+            key: SourceCategory.Pictures,
+            text: intl.get("contentView.pictures"),
+        },
+        {
+            key: SourceCategory.Videos,
+            text: intl.get("contentView.videos"),
+        },
+    ]
+
     onSourceEditOptionChange = (_, option: IDropdownOption) => {
         this.setState({ sourceEditOption: option.key as string })
     }
@@ -185,7 +207,23 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
     addSource = (event: React.FormEvent) => {
         event.preventDefault()
         let trimmed = this.state.newUrl.trim()
-        if (urlTest(trimmed)) this.props.addSource(trimmed)
+        if (urlTest(trimmed))
+            this.props.addSource(
+                trimmed,
+                this.state.newCategory as SourceCategory
+            )
+    }
+
+    onNewCategoryChange = (_, option: IDropdownOption) => {
+        this.setState({ newCategory: String(option.key) })
+    }
+
+    onSourceCategoryChange = (_, option: IDropdownOption) => {
+        const category = option.key as SourceCategory
+        this.props.updateSourceCategory(this.state.selectedSource, category)
+        this.setState({
+            selectedSource: { ...this.state.selectedSource, category },
+        })
     }
 
     onOpenTargetChange = (
@@ -237,6 +275,12 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
 
             <form onSubmit={this.addSource}>
                 <Label htmlFor="newUrl">{intl.get("sources.add")}</Label>
+                <Dropdown
+                    label={intl.get("contentView.category")}
+                    options={this.categoryOptions()}
+                    selectedKey={this.state.newCategory}
+                    onChange={this.onNewCategoryChange}
+                />
                 <Stack horizontal>
                     <Stack.Item grow>
                         <TextField
@@ -373,6 +417,12 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
                             </>
                         )}
                     </Stack>
+                    <Dropdown
+                        label={intl.get("contentView.category")}
+                        options={this.categoryOptions()}
+                        selectedKey={this.state.selectedSource.category}
+                        onChange={this.onSourceCategoryChange}
+                    />
                     {!this.state.selectedSource.serviceRef && (
                         <>
                             <Label>{intl.get("sources.fetchFrequency")}</Label>

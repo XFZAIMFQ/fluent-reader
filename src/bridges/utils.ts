@@ -9,6 +9,15 @@ import { IObjectWithKey } from "@fluentui/react"
 const utilsBridge = {
     platform: process.platform,
 
+    fetchFeed: async (url: string) => {
+        return (await ipcRenderer.invoke("fetch-feed", url)) as {
+            status: number
+            statusText: string
+            contentType: string
+            body: ArrayBuffer
+        }
+    },
+
     getVersion: (): string => {
         return ipcRenderer.sendSync("get-version")
     },

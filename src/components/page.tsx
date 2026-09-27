@@ -1,9 +1,11 @@
 import * as React from "react"
-import { useCallback } from "react"
+import { useCallback, useState } from "react"
+import intl from "react-intl-universal"
 import { Feed } from "./feeds/feed"
+import ModernFeed from "./feeds/modern-feed"
 import { Icon, FocusTrapZone } from "@fluentui/react"
 import ArticleContainer from "../containers/article-container"
-import { ViewType } from "../schema-types"
+import { SourceCategory, ViewType } from "../schema-types"
 import ArticleSearch from "./utils/article-search"
 import { useAppSelector, useAppDispatch } from "../scripts/reducer"
 import { dismissItem, showOffsetItem } from "../scripts/models/page"
@@ -33,14 +35,47 @@ const Page: React.FC = () => {
     const pageClasses = usePageClasses()
 
     const feedId = useAppSelector(s => s.page.feedId)
+    const pageTitle = useAppSelector(s => s.app.title)
+    const menuKey = useAppSelector(s => s.app.menuKey)
     const settingsOn = useAppSelector(s => s.app.settings.display)
-    const menuOn = useAppSelector(s => s.app.menu)
     const contextOn = useAppSelector(
         s => s.app.contextMenu.type !== ContextMenuType.Hidden
     )
     const itemId = useAppSelector(s => s.page.itemId)
     const itemFromFeed = useAppSelector(s => s.page.itemFromFeed)
-    const viewType = useAppSelector(s => s.page.viewType)
+    const contentView = useAppSelector(s => s.page.contentView)
+    const [listWidth, setListWidth] = useState(() => {
+        const saved = Number(localStorage.getItem("modernListWidth"))
+        return saved >= 300 && saved <= 680 ? saved : 390
+    })
+    const [dragging, setDragging] = useState(false)
+
+    const resizeLimit = (element: Element) =>
+        Math.max(300, Math.min(680, element.parentElement.clientWidth - 325))
+
+    const startResize = (event: React.MouseEvent) => {
+        event.preventDefault()
+        setDragging(true)
+        const startX = event.clientX
+        const initialWidth = listWidth
+        const maxWidth = resizeLimit(event.currentTarget)
+        let nextWidth = initialWidth
+        const onMove = (moveEvent: MouseEvent) => {
+            nextWidth = Math.max(
+                300,
+                Math.min(maxWidth, initialWidth + moveEvent.clientX - startX)
+            )
+            setListWidth(nextWidth)
+        }
+        const onUp = () => {
+            setDragging(false)
+            localStorage.setItem("modernListWidth", String(nextWidth))
+            window.removeEventListener("mousemove", onMove)
+            window.removeEventListener("mouseup", onUp)
+        }
+        window.addEventListener("mousemove", onMove)
+        window.addEventListener("mouseup", onUp)
+    }
 
     const handleDismissItem = useCallback(() => dispatch(dismissItem()), [])
     const handleOffsetItem = useCallback(
@@ -59,36 +94,77 @@ const Page: React.FC = () => {
         [handleOffsetItem]
     )
 
-    return viewType === ViewType.List ? (
+    return contentView === "all" || contentView === SourceCategory.Articles ? (
         <>
             {settingsOn ? null : (
-                <div
-                    key="list"
-                    className={"list-main" + (menuOn ? " menu-on" : "")}>
+                <div key="list" className="list-main modern-reader">
                     <ArticleSearch />
-                    <div className="list-feed-container">
+                    <div
+                        className="list-feed-container"
+                        style={{ width: listWidth }}>
+                        <div className="modern-list-heading">
+                            <strong>
+                                {menuKey.startsWith("s-")
+                                    ? pageTitle
+                                    : contentView === "all"
+                                    ? intl.get("allArticles")
+                                    : intl.get("contentView.articles")}
+                            </strong>
+                        </div>
                         <Feed
-                            viewType={viewType}
+                            viewType={ViewType.List}
                             feedId={feedId}
                             key={feedId}
                         />
                     </div>
+                    <div
+                        className={`modern-reader-divider ${
+                            dragging ? "dragging" : ""
+                        }`}
+                        role="separator"
+                        tabIndex={0}
+                        aria-orientation="vertical"
+                        aria-label="Resize article list"
+                        aria-valuemin={300}
+                        aria-valuemax={680}
+                        aria-valuenow={listWidth}
+                        onMouseDown={startResize}
+                        onKeyDown={event => {
+                            if (
+                                event.key !== "ArrowLeft" &&
+                                event.key !== "ArrowRight"
+                            )
+                                return
+                            event.preventDefault()
+                            const direction =
+                                event.key === "ArrowRight" ? 20 : -20
+                            const width = Math.max(
+                                300,
+                                Math.min(
+                                    resizeLimit(event.currentTarget),
+                                    listWidth + direction
+                                )
+                            )
+                            setListWidth(width)
+                            localStorage.setItem(
+                                "modernListWidth",
+                                String(width)
+                            )
+                        }}
+                    />
                     {itemId ? (
                         <div className="side-article-wrapper">
                             <ArticleContainer itemId={itemId} />
                         </div>
                     ) : (
                         <div className="side-logo-wrapper">
-                            <img
-                                className="light"
-                                src="icons/logo-outline.svg"
-                                alt="Fluent Reader logo"
-                            />
-                            <img
-                                className="dark"
-                                src="icons/logo-outline-dark.svg"
-                                alt="Fluent Reader logo"
-                            />
+                            <div className="modern-empty-reader">
+                                <Icon iconName="TextDocument" />
+                                <p>
+                                    {intl.get("articleSelectToRead") ||
+                                        "Select an article to read"}
+                                </p>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -97,13 +173,9 @@ const Page: React.FC = () => {
     ) : (
         <>
             {settingsOn ? null : (
-                <div key="card" className={"main" + (menuOn ? " menu-on" : "")}>
+                <div key="card" className="main modern-collection">
                     <ArticleSearch />
-                    <Feed
-                        viewType={viewType}
-                        feedId={feedId}
-                        key={feedId + viewType}
-                    />
+                    <ModernFeed feedId={feedId} view={contentView} />
                 </div>
             )}
             {!!itemId && (
