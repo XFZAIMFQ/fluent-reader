@@ -149,10 +149,17 @@ export function htmlDecode(input: string) {
     return doc.documentElement.textContent
 }
 
-export const urlTest = (s: string) =>
-    /https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,63}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/gi.test(
-        s
-    )
+export const urlTest = (s: string) => {
+    try {
+        const url = new URL(s)
+        return (
+            (url.protocol === "http:" || url.protocol === "https:") &&
+            Boolean(url.hostname)
+        )
+    } catch {
+        return false
+    }
+}
 
 export const getWindowBreakpoint = () => window.innerWidth >= 1440
 
