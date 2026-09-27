@@ -6,6 +6,26 @@ import { initMainTouchBar } from "./touchbar"
 import * as fontList from "font-list"
 
 export function setUtilsListeners(manager: WindowManager) {
+    // Some sites reject Electron's default user agent.
+    for (const webSession of [
+        session.defaultSession,
+        session.fromPartition("sandbox"),
+    ]) {
+        webSession.webRequest.onBeforeSendHeaders((details, callback) => {
+            const headers = details.requestHeaders
+            const userAgent = Object.keys(headers).find(
+                name => name.toLowerCase() === "user-agent"
+            )
+            if (userAgent) {
+                headers[userAgent] = headers[userAgent].replace(
+                    /\sElectron\/[^\s]+/i,
+                    ""
+                )
+            }
+            callback({ requestHeaders: headers })
+        })
+    }
+
     async function openExternal(url: string, background = false) {
         if (url.startsWith("https://") || url.startsWith("http://")) {
             if (background && process.platform === "darwin") {
