@@ -412,6 +412,10 @@ export function markAllRead(
             let feed = state.feeds[state.page.feedId]
             sids = feed.sids
         }
+        if (state.app.privacyMode) {
+            sids = sids.filter(sid => !state.sources[sid]?.private)
+            if (sids.length === 0) return
+        }
         const action = dispatch(getServiceHooks()).markAllRead?.(
             sids,
             date,

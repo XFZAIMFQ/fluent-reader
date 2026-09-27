@@ -212,3 +212,11 @@ ipcMain.on("get-unread-sources-only", event => {
 ipcMain.handle("set-unread-sources-only", (_, flag: boolean) => {
     store.set(UNREAD_SOURCES_ONLY_STORE_KEY, flag)
 })
+
+const PRIVACY_MODE_STORE_KEY = "privacyMode"
+ipcMain.on("get-privacy-mode", event => {
+    event.returnValue = store.get(PRIVACY_MODE_STORE_KEY, false)
+})
+ipcMain.handle("set-privacy-mode", (_, flag: boolean) => {
+    store.set(PRIVACY_MODE_STORE_KEY, flag)
+})

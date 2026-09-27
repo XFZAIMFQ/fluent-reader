@@ -53,11 +53,11 @@ const label = (view: ContentView) =>
 export const Menu: React.FC = () => {
     const dispatch = useAppDispatch()
     const ready = useAppSelector(s => s.app.sourceInit)
-    const settingsOn = useAppSelector(s => s.app.settings.display)
     const sources = useAppSelector(s => s.sources)
     const groups = useAppSelector(s => s.groups)
     const selected = useAppSelector(s => s.app.menuKey)
     const view = useAppSelector(s => s.page.contentView)
+    const privacyMode = useAppSelector(s => s.app.privacyMode)
     const [adding, setAdding] = useState(false)
     const [url, setUrl] = useState("")
     const [category, setCategory] = useState(SourceCategory.Articles)
@@ -66,6 +66,7 @@ export const Menu: React.FC = () => {
     const visible = Object.values(sources).filter(
         source =>
             !source.hidden &&
+            (!privacyMode || !source.private) &&
             (view === "all" ||
                 (source.category || SourceCategory.Articles) === view)
     )
@@ -79,6 +80,7 @@ export const Menu: React.FC = () => {
             .filter(
                 source =>
                     !source.hidden &&
+                    (!privacyMode || !source.private) &&
                     (tab === "all" ||
                         (source.category || SourceCategory.Articles) === tab)
             )
@@ -93,6 +95,7 @@ export const Menu: React.FC = () => {
                 .filter(
                     source =>
                         !source.hidden &&
+                        (!privacyMode || !source.private) &&
                         (source.category || SourceCategory.Articles) === next
                 )
                 .map(source => source.sid)
@@ -119,6 +122,7 @@ export const Menu: React.FC = () => {
                 .filter(
                     source =>
                         !source.hidden &&
+                        (!privacyMode || !source.private) &&
                         (source.category || SourceCategory.Articles) ===
                             category
                 )
@@ -140,7 +144,7 @@ export const Menu: React.FC = () => {
         }
     }
 
-    if (!ready || settingsOn) return null
+    if (!ready) return null
 
     return (
         <aside

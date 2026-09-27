@@ -49,6 +49,7 @@ export class RSSSource {
     textDir: SourceTextDirection
     hidden: boolean
     category: SourceCategory
+    private: boolean
 
     constructor(url: string, name: string = null) {
         this.url = url
@@ -59,6 +60,7 @@ export class RSSSource {
         this.textDir = SourceTextDirection.LTR
         this.hidden = false
         this.category = SourceCategory.Articles
+        this.private = false
     }
 
     static async fetchMetaData(source: RSSSource) {
@@ -127,10 +129,14 @@ export type SourceState = {
 
 export function sourcesForContentView(
     sources: SourceState,
-    view: ContentView
+    view: ContentView,
+    privacyMode = false
 ): RSSSource[] {
     return Object.values(sources).filter(
-        source => !source.hidden && (view === "all" || source.category === view)
+        source =>
+            !source.hidden &&
+            (!privacyMode || !source.private) &&
+            (view === "all" || source.category === view)
     )
 }
 

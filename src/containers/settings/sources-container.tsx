@@ -39,6 +39,9 @@ const mapDispatchToProps = (dispatch: AppDispatch) => {
         updateSourceCategory: (source: RSSSource, category: SourceCategory) => {
             dispatch(updateSource({ ...source, category }))
         },
+        updateSourcePrivate: (source: RSSSource, privateSource: boolean) => {
+            dispatch(updateSource({ ...source, private: privateSource }))
+        },
         updateSourceName: (source: RSSSource, name: string) => {
             dispatch(updateSource({ ...source, name: name } as RSSSource))
         },

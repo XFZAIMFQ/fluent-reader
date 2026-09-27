@@ -30,6 +30,8 @@ import {
     SELECT_PAGE,
     PageType,
     selectAllArticles,
+    dismissItem,
+    switchContentView,
     showItemFromId,
 } from "./page"
 import { getCurrentLocale } from "../settings"
@@ -86,6 +88,7 @@ export class AppState {
     menu = getWindowBreakpoint() && window.settings.getDefaultMenu()
     menuKey = ALL
     title = ""
+    privacyMode = window.settings.getPrivacyMode()
     settings = {
         display: false,
         changed: false,
@@ -190,6 +193,7 @@ export interface MenuActionTypes {
 export const TOGGLE_SETTINGS = "TOGGLE_SETTINGS"
 export const SAVE_SETTINGS = "SAVE_SETTINGS"
 export const FREE_MEMORY = "FREE_MEMORY"
+export const SET_PRIVACY_MODE = "SET_PRIVACY_MODE"
 
 interface ToggleSettingsAction {
     type: typeof TOGGLE_SETTINGS
@@ -203,10 +207,15 @@ interface FreeMemoryAction {
     type: typeof FREE_MEMORY
     iids: Set<number>
 }
+interface SetPrivacyModeAction {
+    type: typeof SET_PRIVACY_MODE
+    enabled: boolean
+}
 export type SettingsActionTypes =
     | ToggleSettingsAction
     | SaveSettingsAction
     | FreeMemoryAction
+    | SetPrivacyModeAction
 
 export function closeContextMenu(): AppThunk {
     return (dispatch, getState) => {
@@ -279,6 +288,18 @@ export function toggleMenu(): AppThunk {
 export const toggleLogMenu = () => ({ type: TOGGLE_LOGS })
 export const saveSettings = () => ({ type: SAVE_SETTINGS })
 
+export function setPrivacyMode(enabled: boolean): AppThunk {
+    return dispatch => {
+        window.settings.setPrivacyMode(enabled)
+        dispatch({ type: SET_PRIVACY_MODE, enabled })
+        if (enabled) {
+            dispatch(dismissItem())
+            dispatch(switchContentView("all"))
+            dispatch(selectAllArticles(true))
+        }
+    }
+}
+
 export const toggleSettings = (open = true, sids = new Array<number>()) => ({
     type: TOGGLE_SETTINGS,
     open: open,
@@ -337,6 +358,11 @@ export function setupAutoFetch(): AppThunk {
 
 export function pushNotification(item: RSSItem): AppThunk {
     return (dispatch, getState) => {
+        if (
+            getState().app.privacyMode &&
+            getState().sources[item.source]?.private
+        )
+            return
         const sourceName = getState().sources[item.source].name
         if (!window.utils.isFocused()) {
             const options = { body: sourceName } as any
@@ -427,6 +453,8 @@ export function appReducer(
         | ServiceActionTypes
 ): AppState {
     switch (action.type) {
+        case SET_PRIVACY_MODE:
+            return { ...state, privacyMode: action.enabled }
         case INIT_INTL:
             return {
                 ...state,

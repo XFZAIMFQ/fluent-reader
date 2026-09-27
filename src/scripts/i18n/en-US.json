@@ -160,7 +160,9 @@
         "deleteWarning": "The source and all saved articles will be removed.",
         "selected": "Selected source",
         "selectedMulti": "Selected multiple sources",
-        "hidden": "Hide in \"all articles\""
+        "hidden": "Hide in \"all articles\"",
+        "private": "Private subscription",
+        "privateDescription": "When privacy mode is on, hide this subscription and its articles from the sidebar and timeline."
     },
     "groups": {
         "exist": "This group already exists.",
@@ -223,6 +225,12 @@
         "exportToLite": "Export to Fluent Reader Lite"
     },
     "app": {
+        "applicationSection": "Application",
+        "subscriptionSection": "Subscriptions",
+        "otherSection": "Other",
+        "languageDescription": "Choose the language used in the app.",
+        "privacyMode": "Hide private subscriptions",
+        "privacyDescription": "Hide subscriptions marked private and their articles from the sidebar and timeline.",
         "cleanup": "Clean up",
         "cache": "Clear cache",
         "cacheSize": "Cached {size} of data",

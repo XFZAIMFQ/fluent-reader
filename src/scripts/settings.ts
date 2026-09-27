@@ -94,6 +94,7 @@ export async function importAll() {
             if (!s.textDir) s.textDir = SourceTextDirection.LTR
             if (!s.hidden) s.hidden = false
             if (!s.category) s.category = SourceCategory.Articles
+            if (!s.private) s.private = false
             return db.sources.createRow(s)
         })
         const iRows = configs.lovefield.items.map(i => {

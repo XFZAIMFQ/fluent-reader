@@ -26,6 +26,8 @@ import { RadioGroup, Radio } from "@fluentui/react-components"
 import DangerButton from "../utils/danger-button"
 
 type AppTabProps = {
+    privacyMode: boolean
+    setPrivacyMode: (enabled: boolean) => void
     setLanguage: (option: string) => void
     setFetchInterval: (interval: number) => void
     deleteArticles: (days: number) => Promise<void>
@@ -170,74 +172,93 @@ class AppTab extends React.Component<AppTabProps, AppTabState> {
     }
 
     render = () => (
-        <div className="tab-body">
-            <Label>{intl.get("app.language")}</Label>
-            <Stack horizontal>
-                <Stack.Item>
-                    <Dropdown
-                        defaultSelectedKey={window.settings.getLocaleSettings()}
-                        options={this.languageOptions()}
-                        onChanged={option =>
-                            this.props.setLanguage(String(option.key))
-                        }
-                        style={{ width: 200 }}
-                    />
-                </Stack.Item>
-            </Stack>
-
-            <Label>{intl.get("app.theme")}</Label>
-            <RadioGroup
-                value={this.state.themeSettings}
-                onChange={this.onThemeChange}>
-                <Radio
-                    value={ThemeSettings.Default}
-                    label={intl.get("followSystem")}
+        <div className="tab-body modern-general-settings">
+            <h2 className="modern-settings-section-title">
+                {intl.get("app.applicationSection")}
+            </h2>
+            <div className="modern-setting-row">
+                <div className="modern-setting-copy">
+                    <strong>{intl.get("app.language")}</strong>
+                    <p>{intl.get("app.languageDescription")}</p>
+                </div>
+                <Dropdown
+                    defaultSelectedKey={window.settings.getLocaleSettings()}
+                    options={this.languageOptions()}
+                    onChanged={option =>
+                        this.props.setLanguage(String(option.key))
+                    }
                 />
-                <Radio
-                    value={ThemeSettings.Light}
-                    label={intl.get("app.lightTheme")}
+            </div>
+            <div className="modern-setting-row">
+                <div className="modern-setting-copy">
+                    <strong>{intl.get("app.theme")}</strong>
+                </div>
+                <RadioGroup
+                    value={this.state.themeSettings}
+                    onChange={this.onThemeChange}>
+                    <Radio
+                        value={ThemeSettings.Default}
+                        label={intl.get("followSystem")}
+                    />
+                    <Radio
+                        value={ThemeSettings.Light}
+                        label={intl.get("app.lightTheme")}
+                    />
+                    <Radio
+                        value={ThemeSettings.Dark}
+                        label={intl.get("app.darkTheme")}
+                    />
+                </RadioGroup>
+            </div>
+
+            <h2 className="modern-settings-section-title">
+                {intl.get("app.subscriptionSection")}
+            </h2>
+            <div className="modern-setting-row">
+                <div className="modern-setting-copy">
+                    <strong>{intl.get("app.fetchInterval")}</strong>
+                </div>
+                <Dropdown
+                    defaultSelectedKey={window.settings.getFetchInterval()}
+                    options={this.fetchIntervalOptions()}
+                    onChanged={this.onFetchIntervalChanged}
                 />
-                <Radio
-                    value={ThemeSettings.Dark}
-                    label={intl.get("app.darkTheme")}
+            </div>
+            <div className="modern-setting-row">
+                <div className="modern-setting-copy">
+                    <strong>{intl.get("app.privacyMode")}</strong>
+                    <p>{intl.get("app.privacyDescription")}</p>
+                </div>
+                <Toggle
+                    checked={this.props.privacyMode}
+                    onChange={(_, checked) =>
+                        this.props.setPrivacyMode(Boolean(checked))
+                    }
                 />
-            </RadioGroup>
+            </div>
 
-            <Label>{intl.get("app.fetchInterval")}</Label>
-            <Stack horizontal>
-                <Stack.Item>
-                    <Dropdown
-                        defaultSelectedKey={window.settings.getFetchInterval()}
-                        options={this.fetchIntervalOptions()}
-                        onChanged={this.onFetchIntervalChanged}
-                        style={{ width: 200 }}
-                    />
-                </Stack.Item>
-            </Stack>
-
-            <Label>{intl.get("searchEngine.name")}</Label>
-            <Stack horizontal>
-                <Stack.Item>
-                    <Dropdown
-                        defaultSelectedKey={window.settings.getSearchEngine()}
-                        options={this.searchEngineOptions()}
-                        onChanged={this.onSearchEngineChanged}
-                        style={{ width: 200 }}
-                    />
-                </Stack.Item>
-            </Stack>
-
-            <Stack horizontal verticalAlign="baseline">
-                <Stack.Item grow>
-                    <Label>{intl.get("app.enableProxy")}</Label>
-                </Stack.Item>
-                <Stack.Item>
-                    <Toggle
-                        checked={this.state.pacStatus}
-                        onChange={this.toggleStatus}
-                    />
-                </Stack.Item>
-            </Stack>
+            <h2 className="modern-settings-section-title">
+                {intl.get("app.otherSection")}
+            </h2>
+            <div className="modern-setting-row">
+                <div className="modern-setting-copy">
+                    <strong>{intl.get("searchEngine.name")}</strong>
+                </div>
+                <Dropdown
+                    defaultSelectedKey={window.settings.getSearchEngine()}
+                    options={this.searchEngineOptions()}
+                    onChanged={this.onSearchEngineChanged}
+                />
+            </div>
+            <div className="modern-setting-row">
+                <div className="modern-setting-copy">
+                    <strong>{intl.get("app.enableProxy")}</strong>
+                </div>
+                <Toggle
+                    checked={this.state.pacStatus}
+                    onChange={this.toggleStatus}
+                />
+            </div>
             {this.state.pacStatus && (
                 <form onSubmit={this.setUrl}>
                     <Stack horizontal>

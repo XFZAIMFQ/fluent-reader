@@ -34,7 +34,16 @@ export const Feed: React.FC<FeedOwnProps> = ({ feedId, viewType }) => {
 
     const feed = useAppSelector(s => s.feeds[feedId])
     const items = useAppSelector(s =>
-        s.feeds[feedId] ? s.feeds[feedId].iids.map(iid => s.items[iid]) : []
+        s.feeds[feedId]
+            ? s.feeds[feedId].iids
+                  .map(iid => s.items[iid])
+                  .filter(
+                      item =>
+                          item &&
+                          (!s.app.privacyMode ||
+                              !s.sources[item.source]?.private)
+                  )
+            : []
     )
     const sourceMap = useAppSelector(s => s.sources)
     const filter = useAppSelector(s => s.page.filter)

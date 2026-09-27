@@ -3,14 +3,21 @@ import {
     initIntl,
     saveSettings,
     setupAutoFetch,
+    setPrivacyMode,
 } from "../../scripts/models/app"
 import * as db from "../../scripts/db"
 import AppTab from "../../components/settings/app"
 import { importAll } from "../../scripts/settings"
 import { updateUnreadCounts } from "../../scripts/models/source"
 import { AppDispatch } from "../../scripts/utils"
+import { RootState } from "../../scripts/reducer"
+
+const mapStateToProps = (state: RootState) => ({
+    privacyMode: state.app.privacyMode,
+})
 
 const mapDispatchToProps = (dispatch: AppDispatch) => ({
+    setPrivacyMode: (enabled: boolean) => dispatch(setPrivacyMode(enabled)),
     setLanguage: (option: string) => {
         window.settings.setLocaleSettings(option)
         dispatch(initIntl())
@@ -38,5 +45,5 @@ const mapDispatchToProps = (dispatch: AppDispatch) => ({
     },
 })
 
-const AppTabContainer = connect(null, mapDispatchToProps)(AppTab)
+const AppTabContainer = connect(mapStateToProps, mapDispatchToProps)(AppTab)
 export default AppTabContainer

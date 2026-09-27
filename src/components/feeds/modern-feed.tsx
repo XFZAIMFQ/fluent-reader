@@ -15,7 +15,14 @@ const ModernFeed: React.FC<{ feedId: string; view: ContentView }> = ({
     const feed = useAppSelector(s => s.feeds[feedId])
     const items = useAppSelector(s =>
         s.feeds[feedId]
-            ? s.feeds[feedId].iids.map(iid => s.items[iid]).filter(Boolean)
+            ? s.feeds[feedId].iids
+                  .map(iid => s.items[iid])
+                  .filter(
+                      item =>
+                          item &&
+                          (!s.app.privacyMode ||
+                              !s.sources[item.source]?.private)
+                  )
             : []
     )
     const sources = useAppSelector(s => s.sources)

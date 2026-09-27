@@ -149,7 +149,8 @@ export function showItem(feedId: string, item: RSSItem): AppThunk {
         const state = getState()
         if (
             state.items.hasOwnProperty(item._id) &&
-            state.sources.hasOwnProperty(item.source)
+            state.sources.hasOwnProperty(item.source) &&
+            (!state.app.privacyMode || !state.sources[item.source].private)
         ) {
             dispatch({
                 type: SHOW_ITEM,
@@ -163,6 +164,11 @@ export function showItemFromId(iid: number): AppThunk {
     return (dispatch, getState) => {
         const state = getState()
         const item = state.items[iid]
+        if (
+            !item ||
+            (state.app.privacyMode && state.sources[item.source]?.private)
+        )
+            return
         if (!item.hasRead) dispatch(markRead(item))
         if (item) dispatch(showItem(null, item))
     }
@@ -194,12 +200,16 @@ export function showOffsetItem(offset: number): AppThunk {
         if (!state.page.itemFromFeed) return
         let [itemId, feedId] = [state.page.itemId, state.page.feedId]
         let feed = state.feeds[feedId]
-        let iids = feed.iids
+        let iids = feed.iids.filter(
+            iid =>
+                !state.app.privacyMode ||
+                !state.sources[state.items[iid]?.source]?.private
+        )
         let itemIndex = iids.indexOf(itemId)
         let newIndex = itemIndex + offset
         if (itemIndex < 0) {
             let item = state.items[itemId]
-            let prevs = feed.iids
+            let prevs = iids
                 .map(
                     (id, index) => [state.items[id], index] as [RSSItem, number]
                 )

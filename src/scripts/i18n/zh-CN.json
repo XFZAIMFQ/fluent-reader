@@ -158,7 +158,9 @@
         "deleteWarning": "这将移除订阅源与所有已保存的文章",
         "selected": "选中订阅源",
         "selectedMulti": "选中多个订阅源",
-        "hidden": "从“全部文章”中隐藏"
+        "hidden": "从“全部文章”中隐藏",
+        "private": "私密订阅",
+        "privateDescription": "开启隐私模式时，此订阅及文章不会显示在列表和时间线中。"
     },
     "groups": {
         "exist": "该分组已存在",
@@ -221,6 +223,12 @@
         "exportToLite": "导出至 Fluent Reader Lite"
     },
     "app": {
+        "applicationSection": "应用程序",
+        "subscriptionSection": "订阅",
+        "otherSection": "其他",
+        "languageDescription": "选择应用的显示语言。",
+        "privacyMode": "隐藏私密订阅",
+        "privacyDescription": "从订阅列表和时间线中隐藏标记为私密的订阅及其文章。",
         "cleanup": "清理",
         "cache": "清空缓存",
         "cacheSize": "已缓存{size}数据",

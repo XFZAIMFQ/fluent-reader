@@ -107,4 +107,5 @@ export type SchemaTypes = {
     filterType: number
     listViewConfigs: ViewConfigs
     useNeDB: boolean
+    privacyMode: boolean
 }

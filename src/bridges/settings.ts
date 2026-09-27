@@ -131,6 +131,13 @@ const settingsBridge = {
         ipcRenderer.invoke("set-unread-sources-only", flag)
     },
 
+    getPrivacyMode: (): boolean => {
+        return ipcRenderer.sendSync("get-privacy-mode")
+    },
+    setPrivacyMode: (flag: boolean) => {
+        ipcRenderer.invoke("set-privacy-mode", flag)
+    },
+
     getAll: () => {
         return ipcRenderer.sendSync("get-all-settings") as Object
     },

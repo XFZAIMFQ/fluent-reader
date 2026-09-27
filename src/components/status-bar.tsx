@@ -17,7 +17,9 @@ const StatusBar: React.FC = () => {
     const app = useAppSelector(s => s.app)
     const sources = useAppSelector(s => s.sources)
     const settingsOn = app.settings.display
-    const visible = Object.values(sources).filter(source => !source.hidden)
+    const visible = Object.values(sources).filter(
+        source => !source.hidden && (!app.privacyMode || !source.private)
+    )
     const unread = visible.reduce((sum, source) => sum + source.unreadCount, 0)
     const fetching =
         !app.sourceInit || !app.feedInit || app.syncing || app.fetchingItems

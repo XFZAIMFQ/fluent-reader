@@ -5,7 +5,7 @@ import { RSSSource } from "./models/source"
 import { RSSItem } from "./models/item"
 import { SourceCategory } from "../schema-types"
 
-const sdbSchema = lf.schema.create("sourcesDB", 4)
+const sdbSchema = lf.schema.create("sourcesDB", 5)
 sdbSchema
     .createTable("sources")
     .addColumn("sid", lf.Type.INTEGER)
@@ -21,6 +21,7 @@ sdbSchema
     .addColumn("textDir", lf.Type.NUMBER)
     .addColumn("hidden", lf.Type.BOOLEAN)
     .addColumn("category", lf.Type.STRING)
+    .addColumn("private", lf.Type.BOOLEAN)
     .addNullable(["iconurl", "serviceRef", "rules"])
     .addIndex("idxURL", ["url"], true)
 
@@ -67,6 +68,9 @@ async function onUpgradeSourceDB(rawDb: lf.raw.BackStore) {
             "category",
             SourceCategory.Articles
         )
+    }
+    if (version < 5) {
+        await rawDb.addTableColumn("sources", "private", false)
     }
 }
 
@@ -121,6 +125,7 @@ async function migrateNeDB() {
             doc.textDir = 0
             doc.hidden = false
             doc.category = SourceCategory.Articles
+            doc.private = false
             return sources.createRow(doc)
         })
         const iRows = itemDocs.map(doc => {

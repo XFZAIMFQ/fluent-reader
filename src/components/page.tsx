@@ -37,7 +37,6 @@ const Page: React.FC = () => {
     const feedId = useAppSelector(s => s.page.feedId)
     const pageTitle = useAppSelector(s => s.app.title)
     const menuKey = useAppSelector(s => s.app.menuKey)
-    const settingsOn = useAppSelector(s => s.app.settings.display)
     const contextOn = useAppSelector(
         s => s.app.contextMenu.type !== ContextMenuType.Hidden
     )
@@ -96,88 +95,80 @@ const Page: React.FC = () => {
 
     return contentView === "all" || contentView === SourceCategory.Articles ? (
         <>
-            {settingsOn ? null : (
-                <div key="list" className="list-main modern-reader">
-                    <ArticleSearch />
-                    <div
-                        className="list-feed-container"
-                        style={{ width: listWidth }}>
-                        <div className="modern-list-heading">
-                            <strong>
-                                {menuKey.startsWith("s-")
-                                    ? pageTitle
-                                    : contentView === "all"
-                                    ? intl.get("allArticles")
-                                    : intl.get("contentView.articles")}
-                            </strong>
-                        </div>
-                        <Feed
-                            viewType={ViewType.List}
-                            feedId={feedId}
-                            key={feedId}
-                        />
+            <div key="list" className="list-main modern-reader">
+                <ArticleSearch />
+                <div
+                    className="list-feed-container"
+                    style={{ width: listWidth }}>
+                    <div className="modern-list-heading">
+                        <strong>
+                            {menuKey.startsWith("s-")
+                                ? pageTitle
+                                : contentView === "all"
+                                ? intl.get("allArticles")
+                                : intl.get("contentView.articles")}
+                        </strong>
                     </div>
-                    <div
-                        className={`modern-reader-divider ${
-                            dragging ? "dragging" : ""
-                        }`}
-                        role="separator"
-                        tabIndex={0}
-                        aria-orientation="vertical"
-                        aria-label="Resize article list"
-                        aria-valuemin={300}
-                        aria-valuemax={680}
-                        aria-valuenow={listWidth}
-                        onMouseDown={startResize}
-                        onKeyDown={event => {
-                            if (
-                                event.key !== "ArrowLeft" &&
-                                event.key !== "ArrowRight"
-                            )
-                                return
-                            event.preventDefault()
-                            const direction =
-                                event.key === "ArrowRight" ? 20 : -20
-                            const width = Math.max(
-                                300,
-                                Math.min(
-                                    resizeLimit(event.currentTarget),
-                                    listWidth + direction
-                                )
-                            )
-                            setListWidth(width)
-                            localStorage.setItem(
-                                "modernListWidth",
-                                String(width)
-                            )
-                        }}
+                    <Feed
+                        viewType={ViewType.List}
+                        feedId={feedId}
+                        key={feedId}
                     />
-                    {itemId ? (
-                        <div className="side-article-wrapper">
-                            <ArticleContainer itemId={itemId} />
-                        </div>
-                    ) : (
-                        <div className="side-logo-wrapper">
-                            <div className="modern-empty-reader">
-                                <Icon iconName="TextDocument" />
-                                <p>
-                                    {intl.get("articleSelectToRead") ||
-                                        "Select an article to read"}
-                                </p>
-                            </div>
-                        </div>
-                    )}
                 </div>
-            )}
+                <div
+                    className={`modern-reader-divider ${
+                        dragging ? "dragging" : ""
+                    }`}
+                    role="separator"
+                    tabIndex={0}
+                    aria-orientation="vertical"
+                    aria-label="Resize article list"
+                    aria-valuemin={300}
+                    aria-valuemax={680}
+                    aria-valuenow={listWidth}
+                    onMouseDown={startResize}
+                    onKeyDown={event => {
+                        if (
+                            event.key !== "ArrowLeft" &&
+                            event.key !== "ArrowRight"
+                        )
+                            return
+                        event.preventDefault()
+                        const direction = event.key === "ArrowRight" ? 20 : -20
+                        const width = Math.max(
+                            300,
+                            Math.min(
+                                resizeLimit(event.currentTarget),
+                                listWidth + direction
+                            )
+                        )
+                        setListWidth(width)
+                        localStorage.setItem("modernListWidth", String(width))
+                    }}
+                />
+                {itemId ? (
+                    <div className="side-article-wrapper">
+                        <ArticleContainer itemId={itemId} />
+                    </div>
+                ) : (
+                    <div className="side-logo-wrapper">
+                        <div className="modern-empty-reader">
+                            <Icon iconName="TextDocument" />
+                            <p>
+                                {intl.get("articleSelectToRead") ||
+                                    "Select an article to read"}
+                            </p>
+                        </div>
+                    </div>
+                )}
+            </div>
         </>
     ) : (
         <>
-            {settingsOn ? null : (
-                <div key="card" className="main modern-collection">
-                    <ArticleSearch />
-                    <ModernFeed feedId={feedId} view={contentView} />
-                </div>
-            )}
+            <div key="card" className="main modern-collection">
+                <ArticleSearch />
+                <ModernFeed feedId={feedId} view={contentView} />
+            </div>
             {!!itemId && (
                 <FocusTrapZone
                     disabled={contextOn}

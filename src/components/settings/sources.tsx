@@ -33,6 +33,7 @@ type SourcesTabProps = {
     acknowledgeSIDs: () => void
     addSource: (url: string, category: SourceCategory) => void
     updateSourceCategory: (source: RSSSource, category: SourceCategory) => void
+    updateSourcePrivate: (source: RSSSource, privateSource: boolean) => void
     updateSourceName: (source: RSSSource, name: string) => void
     updateSourceIcon: (source: RSSSource, iconUrl: string) => Promise<void>
     updateSourceOpenTarget: (
@@ -250,6 +251,17 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
         })
     }
 
+    onTogglePrivate = () => {
+        const privateSource = !this.state.selectedSource.private
+        this.props.updateSourcePrivate(this.state.selectedSource, privateSource)
+        this.setState({
+            selectedSource: {
+                ...this.state.selectedSource,
+                private: privateSource,
+            } as RSSSource,
+        })
+    }
+
     render = () => (
         <div className="tab-body">
             {this.props.serviceOn && (
@@ -423,6 +435,16 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
                         selectedKey={this.state.selectedSource.category}
                         onChange={this.onSourceCategoryChange}
                     />
+                    <div className="modern-setting-row modern-source-private-row">
+                        <div className="modern-setting-copy">
+                            <strong>{intl.get("sources.private")}</strong>
+                            <p>{intl.get("sources.privateDescription")}</p>
+                        </div>
+                        <Toggle
+                            checked={Boolean(this.state.selectedSource.private)}
+                            onChange={this.onTogglePrivate}
+                        />
+                    </div>
                     {!this.state.selectedSource.serviceRef && (
                         <>
                             <Label>{intl.get("sources.fetchFrequency")}</Label>
