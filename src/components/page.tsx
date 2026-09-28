@@ -224,7 +224,6 @@ const Page: React.FC = () => {
     ) : (
         <>
             <div key="card" className="main modern-collection">
-                <div className="modern-window-drag-region" />
                 <ArticleSearch />
                 <ModernFeed feedId={feedId} view={contentView} />
             </div>

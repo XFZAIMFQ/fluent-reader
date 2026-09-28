@@ -507,16 +507,6 @@ body.darwin .modern-brand strong {
     background: var(--white);
 }
 
-.modern-window-drag-region {
-    position: fixed;
-    z-index: 2;
-    top: 0;
-    left: 278px;
-    right: 144px;
-    height: 34px;
-    -webkit-app-region: drag;
-}
-
 .modern-feed {
     display: flex;
     flex-direction: column;
@@ -527,6 +517,7 @@ body.darwin .modern-brand strong {
 }
 
 .modern-feed-heading {
+    position: relative;
     display: flex;
     flex: 0 0 104px;
     align-items: center;
@@ -535,7 +526,16 @@ body.darwin .modern-brand strong {
     height: 104px;
     padding: 38px 28px 26px;
     box-sizing: border-box;
-    -webkit-app-region: no-drag;
+}
+
+.modern-feed-heading::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 144px;
+    left: 0;
+    height: 38px;
+    -webkit-app-region: drag;
 }
 
 .modern-feed-heading img {
