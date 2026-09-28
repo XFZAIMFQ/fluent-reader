@@ -16,6 +16,7 @@ import {
 import {
     closeContextMenu,
     ContextMenuType,
+    openSourceEditor,
     toggleSettings,
 } from "../scripts/models/app"
 import {
@@ -27,10 +28,21 @@ import {
     toggleHidden,
     toggleStarred,
 } from "../scripts/models/item"
-import { ViewType, ImageCallbackTypes, ViewConfigs } from "../schema-types"
-import { FilterType } from "../scripts/models/feed"
+import {
+    ViewType,
+    ImageCallbackTypes,
+    ViewConfigs,
+    SourceCategory,
+} from "../schema-types"
+import { FilterType, initFeeds } from "../scripts/models/feed"
+import { deleteSource, updateSource } from "../scripts/models/source"
+import {
+    addSourceToGroup,
+    removeSourceFromGroup,
+} from "../scripts/models/group"
 import { useAppDispatch, useAppSelector } from "../scripts/reducer"
 import {
+    refreshSourceSelection,
     setViewConfigs,
     showItem,
     switchFilter,
@@ -77,6 +89,8 @@ export function ContextMenu() {
             return <ViewContextMenu />
         case ContextMenuType.Group:
             return <GroupContextMenu />
+        case ContextMenuType.Source:
+            return <SourceContextMenu />
         case ContextMenuType.MarkRead:
             return <MarkReadContextMenu />
     }
@@ -543,6 +557,155 @@ function GroupContextMenu() {
     return <ContextMenuBase menuItems={menuItems} />
 }
 
+function SourceContextMenu() {
+    const dispatch = useAppDispatch()
+    const sid = useAppSelector(state => state.app.contextMenu.target) as number
+    const source = useAppSelector(state => state.sources[sid])
+    const groups = useAppSelector(state => state.groups)
+    if (!source) return null
+
+    const currentGroupIndex = groups.findIndex(group =>
+        group.sids.includes(sid)
+    )
+    const currentGroup = groups[currentGroupIndex]
+    const categories = [
+        SourceCategory.Articles,
+        SourceCategory.Social,
+        SourceCategory.Pictures,
+        SourceCategory.Videos,
+    ]
+    const menuItems: IContextualMenuItem[] = [
+        {
+            key: "markAllRead",
+            text: intl.get("nav.markAllRead"),
+            iconProps: { iconName: "CheckMark" },
+            onClick: () => {
+                dispatch(markAllRead([sid]))
+            },
+        },
+        {
+            key: "refresh",
+            text: intl.get("nav.refresh"),
+            iconProps: { iconName: "Sync" },
+            onClick: () => {
+                dispatch(fetchItems(false, [sid]))
+            },
+        },
+        { key: "sourceDivider1", itemType: ContextualMenuItemType.Divider },
+        {
+            key: "edit",
+            text: intl.get("edit"),
+            iconProps: { iconName: "Edit" },
+            onClick: () => {
+                dispatch(openSourceEditor(sid))
+            },
+        },
+        {
+            key: "moveGroup",
+            text: intl.get("groups.chooseGroup"),
+            iconProps: { iconName: "Folder" },
+            subMenuProps: {
+                items: [
+                    {
+                        key: "ungrouped",
+                        text: intl.get("groups.exitGroup"),
+                        canCheck: true,
+                        checked: !currentGroup?.isMultiple,
+                        onClick: () => {
+                            if (currentGroup?.isMultiple) {
+                                dispatch(
+                                    removeSourceFromGroup(currentGroupIndex, [
+                                        sid,
+                                    ])
+                                )
+                                dispatch(refreshSourceSelection())
+                                dispatch(initFeeds(true))
+                            }
+                        },
+                    },
+                    ...groups
+                        .map((group, index) => ({ group, index }))
+                        .filter(({ group }) => group.isMultiple)
+                        .map(({ group, index }) => ({
+                            key: `group-${index}`,
+                            text: group.name,
+                            canCheck: true,
+                            checked: index === currentGroupIndex,
+                            onClick: () => {
+                                dispatch(addSourceToGroup(index, sid))
+                                dispatch(refreshSourceSelection())
+                                dispatch(initFeeds(true))
+                            },
+                        })),
+                ],
+            },
+        },
+        {
+            key: "view",
+            text: intl.get("context.view"),
+            iconProps: { iconName: "View" },
+            subMenuProps: {
+                items: categories.map(category => ({
+                    key: category,
+                    text: intl.get(`contentView.${category}`),
+                    canCheck: true,
+                    checked:
+                        (source.category || SourceCategory.Articles) ===
+                        category,
+                    onClick: () => {
+                        if (source.category !== category)
+                            dispatch(
+                                updateSource({ ...source, category })
+                            ).then(() => {
+                                dispatch(refreshSourceSelection())
+                                dispatch(initFeeds(true))
+                            })
+                    },
+                })),
+            },
+        },
+        { key: "sourceDivider2", itemType: ContextualMenuItemType.Divider },
+        {
+            key: "openSource",
+            text: intl.get("openExternal"),
+            iconProps: { iconName: "NavigateExternalInline" },
+            onClick: () => globalThis.utils.openExternal(source.url),
+        },
+        {
+            key: "copySourceUrl",
+            text: intl.get("context.copyURL"),
+            iconProps: { iconName: "Link" },
+            onClick: () => globalThis.utils.writeClipboard(source.url),
+        },
+        { key: "sourceDivider3", itemType: ContextualMenuItemType.Divider },
+        {
+            key: "unsubscribe",
+            text: intl.get("sources.delete"),
+            iconProps: { iconName: "Delete" },
+            disabled: Boolean(source.serviceRef),
+            onClick: () => {
+                void globalThis.utils
+                    .showMessageBox(
+                        intl.get("sources.delete"),
+                        intl.get("sources.deleteWarning"),
+                        intl.get("delete"),
+                        intl.get("cancel"),
+                        true,
+                        "warning"
+                    )
+                    .then(async confirmed => {
+                        if (confirmed) {
+                            await dispatch(deleteSource(source))
+                            dispatch(refreshSourceSelection())
+                            dispatch(initFeeds(true))
+                        }
+                    })
+            },
+        },
+    ]
+    return <ContextMenuBase menuItems={menuItems} />
+}
+
 function MarkReadContextMenu() {
     const dispatch = useAppDispatch()
 
@@ -603,6 +766,7 @@ function ContextMenuBase({
 
     return (
         <ContextualMenu
+            className="modern-context-menu"
             directionalHint={DirectionalHint.bottomLeftEdge}
             items={menuItems}
             target={

@@ -8,11 +8,17 @@ import {
     FeedActionTypes,
     INIT_FEED,
 } from "./feed"
+import intl from "react-intl-universal"
 import { getWindowBreakpoint, AppThunk, ActionStatus } from "../utils"
 import { RSSItem, markRead } from "./item"
 import { SourceActionTypes, DELETE_SOURCE } from "./source"
 import { toggleMenu } from "./app"
-import { ViewType, ViewConfigs, ContentView } from "../../schema-types"
+import {
+    ViewType,
+    ViewConfigs,
+    ContentView,
+    SourceCategory,
+} from "../../schema-types"
 
 export const SELECT_PAGE = "SELECT_PAGE"
 export const SWITCH_VIEW = "SWITCH_VIEW"
@@ -99,10 +105,11 @@ export function selectAllArticles(init = false): AppThunk {
 export function selectSources(
     sids: number[],
     menuKey: string,
-    title: string
+    title: string,
+    force = false
 ): AppThunk {
     return (dispatch, getState) => {
-        if (getState().app.menuKey !== menuKey) {
+        if (force || getState().app.menuKey !== menuKey) {
             dispatch({
                 type: SELECT_PAGE,
                 pageType: PageType.Sources,
@@ -113,6 +120,76 @@ export function selectSources(
                 title: title,
                 init: true,
             } as PageActionTypes)
+        }
+    }
+}
+
+export function refreshSourceSelection(): AppThunk {
+    return (dispatch, getState) => {
+        const state = getState()
+        const key = state.app.menuKey
+        const visible = (sid: number) => {
+            const source = state.sources[sid]
+            return (
+                source &&
+                !source.hidden &&
+                (!state.app.privacyMode || !source.private) &&
+                (state.page.contentView === "all" ||
+                    (source.category || SourceCategory.Articles) ===
+                        state.page.contentView)
+            )
+        }
+        if (key.startsWith("s-")) {
+            const sid = Number(key.slice(2))
+            const source = state.sources[sid]
+            if (
+                !source ||
+                source.hidden ||
+                (state.app.privacyMode && source.private)
+            ) {
+                dispatch(selectAllArticles(true))
+            } else {
+                dispatch(
+                    switchContentView(
+                        source.category || SourceCategory.Articles
+                    )
+                )
+                dispatch(selectSources([sid], key, source.name, true))
+            }
+        } else if (key.startsWith("category-")) {
+            const category = key.slice(9) as SourceCategory
+            dispatch(
+                selectSources(
+                    Object.values(state.sources)
+                        .filter(
+                            source =>
+                                !source.hidden &&
+                                (!state.app.privacyMode || !source.private) &&
+                                (source.category || SourceCategory.Articles) ===
+                                    category
+                        )
+                        .map(source => source.sid),
+                    key,
+                    intl.get(`contentView.${category}`),
+                    true
+                )
+            )
+        } else if (key.startsWith("g-")) {
+            const group = state.groups[Number(key.slice(2))]
+            if (group) {
+                dispatch(
+                    selectSources(
+                        group.sids.filter(visible),
+                        key,
+                        group.name,
+                        true
+                    )
+                )
+            } else {
+                dispatch(selectAllArticles(true))
+            }
+        } else {
+            dispatch(selectAllArticles(true))
         }
     }
 }

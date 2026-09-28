@@ -788,6 +788,24 @@ body.darwin .modern-brand strong {
     background: #0007;
 }
 
+.ms-ContextualMenu-container .ms-ContextualMenu {
+    min-width: 220px;
+    padding: 6px;
+    border: 1px solid var(--neutralQuaternaryAlt);
+    border-radius: 10px;
+    background: var(--white);
+    box-shadow: 0 12px 32px #0002;
+}
+
+.ms-ContextualMenu-container .ms-ContextualMenu-link {
+    min-height: 34px;
+    border-radius: 6px;
+}
+
+.ms-ContextualMenu-container .ms-ContextualMenu-link:hover {
+    background: var(--neutralLighterAlt);
+}
+
 .modern-add-dialog {
     display: flex;
     flex-direction: column;

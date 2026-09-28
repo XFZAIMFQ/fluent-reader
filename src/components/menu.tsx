@@ -13,7 +13,11 @@ import { ContentView, SourceCategory } from "../schema-types"
 import { addSource, RSSSource } from "../scripts/models/source"
 import { initFeeds } from "../scripts/models/feed"
 import { useAppDispatch, useAppSelector } from "../scripts/reducer"
-import { openGroupMenu, toggleSettings } from "../scripts/models/app"
+import {
+    openGroupMenu,
+    openSourceMenu,
+    toggleSettings,
+} from "../scripts/models/app"
 import { toggleGroupExpansion } from "../scripts/models/group"
 import {
     selectAllArticles,
@@ -243,7 +247,7 @@ export const Menu: React.FC = () => {
                                 active={selected === `s-${source.sid}`}
                                 onClick={() => selectSource(source)}
                                 onContextMenu={event =>
-                                    dispatch(openGroupMenu([source.sid], event))
+                                    dispatch(openSourceMenu(source.sid, event))
                                 }
                             />
                         )
@@ -294,8 +298,8 @@ export const Menu: React.FC = () => {
                                         onClick={() => selectSource(source)}
                                         onContextMenu={event =>
                                             dispatch(
-                                                openGroupMenu(
-                                                    [source.sid],
+                                                openSourceMenu(
+                                                    source.sid,
                                                     event
                                                 )
                                             )

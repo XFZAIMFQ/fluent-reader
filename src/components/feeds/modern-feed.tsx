@@ -1,4 +1,5 @@
 import * as React from "react"
+import { openItemMenu } from "../../scripts/models/app"
 import intl from "react-intl-universal"
 import { ContentView, SourceCategory } from "../../schema-types"
 import { loadMore } from "../../scripts/models/feed"
@@ -69,7 +70,7 @@ const ModernFeed: React.FC<{ feedId: string; view: ContentView }> = ({
                                 onClick={() => open(item)}
                                 onContextMenu={event => {
                                     event.preventDefault()
-                                    open(item)
+                                    dispatch(openItemMenu(item, feedId, event))
                                 }}>
                                 {view === SourceCategory.Pictures && image && (
                                     <div className="modern-picture-frame">

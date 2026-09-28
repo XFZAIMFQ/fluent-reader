@@ -44,6 +44,7 @@ export const enum ContextMenuType {
     Text,
     View,
     Group,
+    Source,
     Image,
     MarkRead,
 }
@@ -89,6 +90,7 @@ export class AppState {
     menuKey = ALL
     title = ""
     privacyMode = window.settings.getPrivacyMode()
+    sourceEditorSid: number | null = null
     settings = {
         display: false,
         changed: false,
@@ -105,7 +107,7 @@ export class AppState {
         type: ContextMenuType
         event?: MouseEvent | string
         position?: [number, number]
-        target?: [RSSItem, string] | number[] | [string, string]
+        target?: [RSSItem, string] | number[] | number | [string, string]
     }
 
     constructor() {
@@ -120,6 +122,9 @@ export const OPEN_ITEM_MENU = "OPEN_ITEM_MENU"
 export const OPEN_TEXT_MENU = "OPEN_TEXT_MENU"
 export const OPEN_VIEW_MENU = "OPEN_VIEW_MENU"
 export const OPEN_GROUP_MENU = "OPEN_GROUP_MENU"
+export const OPEN_SOURCE_MENU = "OPEN_SOURCE_MENU"
+export const OPEN_SOURCE_EDITOR = "OPEN_SOURCE_EDITOR"
+export const CLOSE_SOURCE_EDITOR = "CLOSE_SOURCE_EDITOR"
 export const OPEN_IMAGE_MENU = "OPEN_IMAGE_MENU"
 export const OPEN_MARK_ALL_MENU = "OPEN_MARK_ALL_MENU"
 
@@ -154,6 +159,21 @@ interface OpenGroupMenuAction {
     sids: number[]
 }
 
+interface OpenSourceMenuAction {
+    type: typeof OPEN_SOURCE_MENU
+    event: MouseEvent
+    sid: number
+}
+
+interface OpenSourceEditorAction {
+    type: typeof OPEN_SOURCE_EDITOR
+    sid: number
+}
+
+interface CloseSourceEditorAction {
+    type: typeof CLOSE_SOURCE_EDITOR
+}
+
 interface OpenImageMenuAction {
     type: typeof OPEN_IMAGE_MENU
     position: [number, number]
@@ -165,6 +185,9 @@ export type ContextMenuActionTypes =
     | OpenTextMenuAction
     | OpenViewMenuAction
     | OpenGroupMenuAction
+    | OpenSourceMenuAction
+    | OpenSourceEditorAction
+    | CloseSourceEditorAction
     | OpenImageMenuAction
     | OpenMarkAllMenuAction
 
@@ -264,6 +287,22 @@ export function openGroupMenu(
         sids: sids,
     }
 }
+
+export function openSourceMenu(
+    sid: number,
+    event: React.MouseEvent
+): ContextMenuActionTypes {
+    return { type: OPEN_SOURCE_MENU, event: event.nativeEvent, sid }
+}
+
+export const openSourceEditor = (sid: number): ContextMenuActionTypes => ({
+    type: OPEN_SOURCE_EDITOR,
+    sid,
+})
+
+export const closeSourceEditor = (): ContextMenuActionTypes => ({
+    type: CLOSE_SOURCE_EDITOR,
+})
 
 export function openImageMenu(
     position: [number, number]
@@ -664,6 +703,19 @@ export function appReducer(
                     target: action.sids,
                 },
             }
+        case OPEN_SOURCE_MENU:
+            return {
+                ...state,
+                contextMenu: {
+                    type: ContextMenuType.Source,
+                    event: action.event,
+                    target: action.sid,
+                },
+            }
+        case OPEN_SOURCE_EDITOR:
+            return { ...state, sourceEditorSid: action.sid }
+        case CLOSE_SOURCE_EDITOR:
+            return { ...state, sourceEditorSid: null }
         case OPEN_IMAGE_MENU:
             return {
                 ...state,

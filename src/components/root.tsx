@@ -5,6 +5,7 @@ import { Menu } from "./menu"
 import Nav from "./nav"
 import StatusBar from "./status-bar"
 import Settings from "./settings"
+import { SourceEditor } from "./source-editor"
 import { useAppDispatch, useAppSelector } from "../scripts/reducer"
 import { ContextMenu } from "./context-menu"
 import LogMenu from "./log-menu"
@@ -61,6 +62,7 @@ const Root: React.FC = () => {
                             <StatusBar />
                             <LogMenu />
                             <Settings />
+                            <SourceEditor />
                             <ContextMenu />
                         </div>
                     </CustomStyleHooksProvider>
