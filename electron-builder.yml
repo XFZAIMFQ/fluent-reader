@@ -1,5 +1,9 @@
 appId: me.hyliu.fluentreader
 productName: Fluent Reader
+protocols:
+    - name: Fluent Reader Subscription
+      schemes:
+          - fluentreader
 copyright: Copyright © 2020 Haoyuan Liu
 files:
     - "./dist/**/*"

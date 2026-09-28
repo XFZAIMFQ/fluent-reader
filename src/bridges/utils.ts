@@ -3,11 +3,23 @@ import {
     ImageCallbackTypes,
     TouchBarTexts,
     WindowStateListenerType,
+    SubscribeLinkRequest,
 } from "../schema-types"
 import { IObjectWithKey } from "@fluentui/react"
 
 const utilsBridge = {
     platform: process.platform,
+
+    takeSubscribeLink: async (): Promise<SubscribeLinkRequest | null> => {
+        return ipcRenderer.invoke("take-subscribe-link")
+    },
+    onSubscribeLinkAvailable: (callback: () => void) => {
+        const listener = () => callback()
+        ipcRenderer.on("subscribe-link-available", listener)
+        return () => {
+            ipcRenderer.removeListener("subscribe-link-available", listener)
+        }
+    },
 
     fetchFeed: async (url: string) => {
         return (await ipcRenderer.invoke("fetch-feed", url)) as {

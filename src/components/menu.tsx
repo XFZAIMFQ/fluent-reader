@@ -1,5 +1,5 @@
 import * as React from "react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import intl from "react-intl-universal"
 import { Icon } from "@fluentui/react"
 import {
@@ -66,6 +66,20 @@ export const Menu: React.FC = () => {
     const [url, setUrl] = useState("")
     const [category, setCategory] = useState(SourceCategory.Articles)
     const [submitting, setSubmitting] = useState(false)
+
+    useEffect(() => {
+        const takeLink = async () => {
+            const request = await globalThis.utils.takeSubscribeLink()
+            if (!request) return
+            setUrl(request.url)
+            setCategory(request.view)
+            setAdding(true)
+        }
+        const removeListener =
+            globalThis.utils.onSubscribeLinkAvailable(takeLink)
+        void takeLink()
+        return removeListener
+    }, [])
 
     const visible = Object.values(sources).filter(
         source =>
@@ -334,23 +348,37 @@ export const Menu: React.FC = () => {
                             onChange={event => setUrl(event.target.value)}
                             placeholder="http://localhost:1200/..."
                         />
-                        <label htmlFor="modern-source-category">
+                        <span
+                            className="modern-add-category-label"
+                            id="modern-source-category-label">
                             {intl.get("contentView.category")}
-                        </label>
-                        <select
-                            id="modern-source-category"
-                            value={category}
-                            onChange={event =>
-                                setCategory(
-                                    event.target.value as SourceCategory
-                                )
-                            }>
-                            {views.slice(1).map(option => (
-                                <option key={option} value={option}>
-                                    {label(option)}
-                                </option>
-                            ))}
-                        </select>
+                        </span>
+                        <div
+                            className="modern-add-category-options"
+                            role="radiogroup"
+                            aria-labelledby="modern-source-category-label">
+                            {(views.slice(1) as SourceCategory[]).map(
+                                option => {
+                                    const CategoryIcon = viewIcons[option]
+                                    return (
+                                        <button
+                                            type="button"
+                                            role="radio"
+                                            aria-checked={category === option}
+                                            key={option}
+                                            className={
+                                                category === option
+                                                    ? "selected"
+                                                    : ""
+                                            }
+                                            onClick={() => setCategory(option)}>
+                                            <CategoryIcon />
+                                            {label(option)}
+                                        </button>
+                                    )
+                                }
+                            )}
+                        </div>
                         <div className="modern-dialog-actions">
                             <button
                                 type="button"

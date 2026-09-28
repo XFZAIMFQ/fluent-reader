@@ -1,11 +1,7 @@
 import * as React from "react"
 import intl from "react-intl-universal"
 import { Icon } from "@fluentui/react"
-import {
-    exitSettings,
-    toggleLogMenu,
-    toggleSettings,
-} from "../scripts/models/app"
+import { toggleLogMenu } from "../scripts/models/app"
 import { useAppDispatch, useAppSelector } from "../scripts/reducer"
 import { FlatButton } from "./utils/FlatButton"
 import { FlatButtonGroup } from "./utils/FlatButtonGroup"
@@ -44,14 +40,6 @@ const StatusBar: React.FC = () => {
                         </FlatButton>
                     </>
                 )}
-                <FlatButton
-                    ariaLabel={intl.get("nav.settings")}
-                    title={intl.get("nav.settings")}
-                    onClick={() =>
-                        dispatch(settingsOn ? exitSettings() : toggleSettings())
-                    }>
-                    <Icon iconName="Settings" />
-                </FlatButton>
             </FlatButtonGroup>
         </footer>
     )

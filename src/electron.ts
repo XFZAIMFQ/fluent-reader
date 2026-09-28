@@ -3,6 +3,7 @@ import { ThemeSettings, SchemaTypes } from "./schema-types"
 import { store } from "./main/settings"
 import performUpdate from "./main/update-scripts"
 import { WindowManager } from "./main/window"
+import { initializeSubscribeProtocol } from "./main/subscribe-link"
 
 if (!process.mas) {
     const locked = app.requestSingleInstanceLock()
@@ -10,6 +11,8 @@ if (!process.mas) {
         app.quit()
     }
 }
+
+initializeSubscribeProtocol()
 
 if (!app.isPackaged) app.setAppUserModelId(process.execPath)
 else if (process.platform === "win32")

@@ -2,6 +2,7 @@ import * as React from "react"
 import { useEffect, useState } from "react"
 import intl from "react-intl-universal"
 import { makeStyles, mergeClasses } from "@griffel/react"
+import { Dropdown } from "@fluentui/react"
 import {
     Chat24Regular,
     DocumentText24Regular,
@@ -89,6 +90,14 @@ const useStyles = makeStyles({
         backgroundColor: "var(--white)",
         color: "var(--neutralPrimary)",
         font: "inherit",
+    },
+    groupDropdown: {
+        "& .ms-Dropdown-title": {
+            height: "38px",
+            padding: "0 12px",
+            borderRadius: "8px",
+            lineHeight: "36px",
+        },
     },
     toggle: {
         display: "flex",
@@ -351,28 +360,41 @@ export function SourceEditor() {
                             required
                         />
                     </label>
-                    <label className={classes.field}>
-                        <span className={classes.label}>
+                    <div className={classes.field}>
+                        <label
+                            htmlFor="source-editor-group"
+                            className={classes.label}>
                             {intl.get("groups.group")}
-                        </span>
-                        <select
-                            className={classes.input}
-                            value={groupIndex}
-                            onChange={event =>
-                                setGroupIndex(Number(event.target.value))
-                            }>
-                            <option value={-1}>
-                                {intl.get("sources.ungrouped")}
-                            </option>
-                            {groups.map((group, index) =>
-                                group.isMultiple ? (
-                                    <option key={index} value={index}>
-                                        {group.name}
-                                    </option>
-                                ) : null
-                            )}
-                        </select>
-                    </label>
+                        </label>
+                        <Dropdown
+                            id="source-editor-group"
+                            className={classes.groupDropdown}
+                            ariaLabel={intl.get("groups.group")}
+                            styles={{
+                                callout: {
+                                    borderRadius: 8,
+                                    overflow: "hidden",
+                                },
+                            }}
+                            selectedKey={groupIndex}
+                            options={[
+                                {
+                                    key: -1,
+                                    text: intl.get("sources.ungrouped"),
+                                },
+                                ...groups
+                                    .map((group, index) => ({ group, index }))
+                                    .filter(({ group }) => group.isMultiple)
+                                    .map(({ group, index }) => ({
+                                        key: index,
+                                        text: group.name,
+                                    })),
+                            ]}
+                            onChange={(_, option) =>
+                                setGroupIndex(Number(option.key))
+                            }
+                        />
+                    </div>
                     <label className={classes.toggle}>
                         <input
                             type="checkbox"

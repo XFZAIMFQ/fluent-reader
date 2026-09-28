@@ -35,6 +35,11 @@ export const enum SourceCategory {
 
 export type ContentView = "all" | SourceCategory
 
+export interface SubscribeLinkRequest {
+    url: string
+    view: SourceCategory
+}
+
 export const enum ViewConfigs {
     ShowCover = 1 << 0,
     ShowSnippet = 1 << 1,

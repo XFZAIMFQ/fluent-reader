@@ -117,6 +117,8 @@ body.darwin .modern-brand strong {
 }
 
 .modern-sidebar-actions button {
+    display: grid;
+    place-items: center;
     width: 30px;
     height: 30px;
     padding: 0;
@@ -125,6 +127,7 @@ body.darwin .modern-brand strong {
     background: transparent;
     color: var(--neutralSecondary);
     cursor: pointer;
+    line-height: 1;
     -webkit-app-region: no-drag;
 }
 
@@ -617,9 +620,38 @@ body.darwin .modern-brand strong {
 
 .modern-entry h2 {
     margin: 9px 0 0;
+    overflow: hidden;
     font-size: 15px;
     font-weight: 600;
     line-height: 1.45;
+    white-space: nowrap;
+}
+
+.modern-entry h2 span {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: top;
+    white-space: nowrap;
+}
+
+.modern-entry h2.scrolling span {
+    max-width: none;
+    overflow: visible;
+    animation: modern-title-pan var(--title-scroll-duration) linear infinite
+        alternate;
+}
+
+@keyframes modern-title-pan {
+    0%,
+    15% {
+        transform: translateX(0);
+    }
+    85%,
+    100% {
+        transform: translateX(calc(-1 * var(--title-scroll-distance)));
+    }
 }
 
 .modern-entry.read h2 {
@@ -661,15 +693,78 @@ body.darwin .modern-brand strong {
 }
 
 .modern-feed-pictures .modern-feed-items {
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
 }
 
 .modern-feed-pictures .modern-entry,
-.modern-feed-pictures .modern-entry:hover {
+.modern-feed-videos .modern-entry {
+    position: relative;
+    max-width: 360px;
+    padding: 6px;
     overflow: visible;
     border: 0;
-    border-radius: 0;
+    border-radius: 12px;
     background: transparent;
+    box-sizing: border-box;
+}
+
+.modern-feed-pictures .modern-entry:hover,
+.modern-feed-videos .modern-entry:hover,
+.modern-feed-pictures .modern-entry:focus-within,
+.modern-feed-videos .modern-entry:focus-within {
+    background: rgb(236 236 238);
+}
+
+.modern-entry-main {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+}
+
+.modern-entry-quick-actions {
+    position: absolute;
+    z-index: 2;
+    top: 10px;
+    right: 8px;
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    border: 1px solid var(--neutralQuaternaryAlt);
+    border-radius: 8px;
+    background: var(--white);
+    box-shadow: 0 4px 14px #0002;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease;
+}
+
+.modern-entry:hover .modern-entry-quick-actions,
+.modern-entry:focus-within .modern-entry-quick-actions {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.modern-entry-quick-actions button {
+    display: grid;
+    place-items: center;
+    width: 25px;
+    height: 25px;
+    padding: 0;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--neutralPrimary);
+    cursor: pointer;
+}
+
+.modern-entry-quick-actions button:hover {
+    background: var(--neutralLight);
 }
 
 .modern-picture-frame {
@@ -704,20 +799,12 @@ body.darwin .modern-brand strong {
 .modern-feed-pictures .modern-entry h2 {
     order: 1;
     margin: 0;
-    display: -webkit-box;
-    overflow: hidden;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
     font-size: 13px;
 }
 
 .modern-feed-videos .modern-feed-items {
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
     gap: 20px;
-}
-
-.modern-feed-videos .modern-entry {
-    border: 0;
 }
 
 .modern-entry-video {
@@ -823,14 +910,14 @@ body.darwin .modern-brand strong {
     font-size: 17px;
 }
 
-.modern-add-dialog label {
+.modern-add-dialog label,
+.modern-add-category-label {
     margin-top: 7px;
     color: var(--neutralSecondary);
     font-size: 12px;
 }
 
-.modern-add-dialog input,
-.modern-add-dialog select {
+.modern-add-dialog input {
     height: 36px;
     padding: 0 10px;
     border: 1px solid var(--neutralQuaternaryAlt);
@@ -838,6 +925,42 @@ body.darwin .modern-brand strong {
     background: var(--white);
     color: var(--neutralPrimary);
     font: inherit;
+}
+
+.modern-add-category-options {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.modern-add-category-options button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+    min-height: 66px;
+    padding: 7px 3px;
+    border: 1px solid var(--neutralQuaternaryAlt);
+    border-radius: 8px;
+    background: var(--white);
+    color: var(--neutralSecondary);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.modern-add-category-options button svg {
+    width: 22px;
+    height: 22px;
+}
+
+.modern-add-category-options button:hover,
+.modern-add-category-options button.selected {
+    border-color: var(--primary);
+    background: var(--neutralLighterAlt);
+    color: var(--primary);
 }
 
 .modern-dialog-actions {
@@ -1016,6 +1139,8 @@ body.darwin .modern-brand strong {
 }
 
 .modern-settings-header button {
+    display: grid;
+    place-items: center;
     width: 32px;
     height: 32px;
     border: 0;
@@ -1024,6 +1149,16 @@ body.darwin .modern-brand strong {
     color: var(--neutralPrimary);
     cursor: pointer;
     font-size: 16px;
+    line-height: 1;
+}
+
+@media (prefers-color-scheme: dark) {
+    .modern-feed-pictures .modern-entry:hover,
+    .modern-feed-videos .modern-entry:hover,
+    .modern-feed-pictures .modern-entry:focus-within,
+    .modern-feed-videos .modern-entry:focus-within {
+        background: var(--neutralLight);
+    }
 }
 
 .modern-settings-header button:hover {

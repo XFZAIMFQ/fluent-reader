@@ -193,6 +193,12 @@ function ItemContextMenu() {
             },
         },
         {
+            key: "editSource",
+            text: intl.get("sources.edit"),
+            iconProps: { iconName: "Edit" },
+            onClick: () => dispatch(openSourceEditor(item.source)),
+        },
+        {
             key: "divider_1",
             itemType: ContextualMenuItemType.Divider,
         },

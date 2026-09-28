@@ -3,6 +3,7 @@ import { BrowserWindow, nativeTheme, app } from "electron"
 import * as path from "node:path"
 import { setThemeListener } from "./settings"
 import { setUtilsListeners } from "./utils"
+import { captureSubscribeLink } from "./subscribe-link"
 
 export class WindowManager {
     mainWindow: BrowserWindow = null
@@ -13,6 +14,11 @@ export class WindowManager {
     }
 
     private init = () => {
+        app.on("second-instance", (_, commandLine) => {
+            captureSubscribeLink(commandLine)
+            if (this.hasWindow()) this.mainWindow.focus()
+        })
+
         app.on("ready", () => {
             this.mainWindowState = windowStateKeeper({
                 defaultWidth: 1200,
@@ -26,12 +32,6 @@ export class WindowManager {
     private setListeners = () => {
         setThemeListener(this)
         setUtilsListeners(this)
-
-        app.on("second-instance", () => {
-            if (this.mainWindow !== null) {
-                this.mainWindow.focus()
-            }
-        })
 
         app.on("activate", () => {
             if (this.mainWindow === null) {
