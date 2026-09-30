@@ -8,11 +8,37 @@ import {
     SyncService,
     ServiceConfigs,
     ViewConfigs,
+    SourceCategory,
+    MediaLayout,
 } from "../schema-types"
 import { ipcMain, session, nativeTheme, app } from "electron"
 import { WindowManager } from "./window"
 
 export const store = new Store<SchemaTypes>()
+
+ipcMain.on("get-media-layout", (event, view: SourceCategory) => {
+    event.returnValue = store.get("mediaLayouts", {})[view] || {
+        columns: 0,
+        imageOnly: false,
+    }
+})
+ipcMain.handle(
+    "set-media-layout",
+    (_, view: SourceCategory, layout: MediaLayout) => {
+        if (![SourceCategory.Pictures, SourceCategory.Videos].includes(view))
+            return
+        const columns =
+            Number.isInteger(layout.columns) &&
+            layout.columns >= 0 &&
+            layout.columns <= 6
+                ? layout.columns
+                : 0
+        store.set("mediaLayouts", {
+            ...store.get("mediaLayouts", {}),
+            [view]: { columns, imageOnly: Boolean(layout.imageOnly) },
+        })
+    }
+)
 
 const GROUPS_STORE_KEY = "sourceGroups"
 ipcMain.handle("set-groups", (_, groups: SourceGroup[]) => {

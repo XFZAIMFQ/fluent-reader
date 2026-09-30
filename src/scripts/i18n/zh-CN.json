@@ -1,6 +1,8 @@
 {
     "allArticles": "全部文章",
-    "status": { "unread": "未读" },
+    "status": {
+        "unread": "未读"
+    },
     "articleSelectToRead": "选择一篇文章开始阅读",
     "contentView": {
         "all": "全部",
@@ -273,5 +275,19 @@
         "pacHint": "对于Socks代理建议PAC返回“SOCKS5”以启用代理端解析。关闭代理需重启应用后生效。",
         "fetchInterval": "自动抓取频率",
         "never": "从不"
+    },
+    "subscriptions": {
+        "starred": "收藏",
+        "autoGroup": "自动按网站分组",
+        "createOnSave": "保存时将创建“{name}”分组。",
+        "refreshIcon": "重新识别网站图标",
+        "moved": "已移到{name}",
+        "undo": "撤销",
+        "collapse": "收起分组",
+        "expand": "展开分组",
+        "layout": "卡片布局",
+        "columns": "每行 {count} 个",
+        "autoColumns": "自动列数",
+        "imageOnly": "仅显示图片"
     }
 }

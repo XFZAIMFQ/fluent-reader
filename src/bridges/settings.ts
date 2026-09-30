@@ -5,10 +5,18 @@ import {
     SearchEngines,
     ServiceConfigs,
     ViewConfigs,
+    MediaLayout,
+    SourceCategory,
 } from "../schema-types"
 import { ipcRenderer } from "electron"
 
 const settingsBridge = {
+    getMediaLayout: (view: SourceCategory): MediaLayout =>
+        ipcRenderer.sendSync("get-media-layout", view),
+    setMediaLayout: (
+        view: SourceCategory,
+        layout: MediaLayout
+    ): Promise<void> => ipcRenderer.invoke("set-media-layout", view, layout),
     saveGroups: (groups: SourceGroup[]) => {
         ipcRenderer.invoke("set-groups", groups)
     },

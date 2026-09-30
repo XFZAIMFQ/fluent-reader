@@ -13,11 +13,13 @@ import { getWindowBreakpoint, AppThunk, ActionStatus } from "../utils"
 import { RSSItem, markRead } from "./item"
 import { SourceActionTypes, DELETE_SOURCE } from "./source"
 import { toggleMenu } from "./app"
+import { sidebarGroups } from "../sidebar-groups"
 import {
     ViewType,
     ViewConfigs,
     ContentView,
     SourceCategory,
+    MediaLayout,
 } from "../../schema-types"
 
 export const SELECT_PAGE = "SELECT_PAGE"
@@ -29,6 +31,8 @@ export const DISMISS_ITEM = "DISMISS_ITEM"
 export const APPLY_FILTER = "APPLY_FILTER"
 export const TOGGLE_SEARCH = "TOGGLE_SEARCH"
 export const SWITCH_CONTENT_VIEW = "SWITCH_CONTENT_VIEW"
+const SET_COLLECTION = "SET_COLLECTION"
+const SET_MEDIA_LAYOUT = "SET_MEDIA_LAYOUT"
 
 export enum PageType {
     AllArticles,
@@ -81,6 +85,16 @@ interface ToggleSearchAction {
 }
 
 export type PageActionTypes =
+    | {
+          type: typeof SET_MEDIA_LAYOUT
+          view: SourceCategory
+          layout: MediaLayout
+      }
+    | {
+          type: typeof SET_COLLECTION
+          active: boolean
+          previousFilter?: FeedFilter
+      }
     | SelectPageAction
     | SwitchViewAction
     | SwitchContentViewAction
@@ -92,6 +106,7 @@ export type PageActionTypes =
 
 export function selectAllArticles(init = false): AppThunk {
     return (dispatch, getState) => {
+        dispatch(leaveCollection())
         dispatch({
             type: SELECT_PAGE,
             keepMenu: getWindowBreakpoint(),
@@ -109,6 +124,7 @@ export function selectSources(
     force = false
 ): AppThunk {
     return (dispatch, getState) => {
+        if (!menuKey.startsWith("starred-")) dispatch(leaveCollection())
         if (force || getState().app.menuKey !== menuKey) {
             dispatch({
                 type: SELECT_PAGE,
@@ -121,6 +137,54 @@ export function selectSources(
                 init: true,
             } as PageActionTypes)
         }
+    }
+}
+
+function leaveCollection(): AppThunk {
+    return (dispatch, getState) => {
+        if (!getState().page.collection) return
+        const filter = getState().page.previousFilter
+        dispatch({ type: SET_COLLECTION, active: false })
+        dispatch(applyFilterDone(filter))
+        // ALL may have retained a filter from before entering a collection.
+        dispatch(selectAllArticles(true))
+    }
+}
+
+export function selectCollection(view: ContentView): AppThunk {
+    return (dispatch, getState) => {
+        const state = getState()
+        const previousFilter = state.page.collection
+            ? state.page.previousFilter
+            : state.page.filter
+        dispatch({ type: SET_COLLECTION, active: true, previousFilter })
+        dispatch(
+            applyFilterDone({
+                ...state.page.filter,
+                type:
+                    FilterType.StarredOnly |
+                    (state.page.filter.type & FilterType.Toggles),
+                search: "",
+            })
+        )
+        dispatch(switchContentView(view))
+        const sids = Object.values(state.sources)
+            .filter(
+                source =>
+                    !source.hidden &&
+                    (!state.app.privacyMode || !source.private) &&
+                    (view === "all" ||
+                        (source.category || SourceCategory.Articles) === view)
+            )
+            .map(source => source.sid)
+        dispatch(
+            selectSources(
+                sids,
+                `starred-${view}`,
+                intl.get("subscriptions.starred"),
+                true
+            )
+        )
     }
 }
 
@@ -139,7 +203,30 @@ export function refreshSourceSelection(): AppThunk {
                         state.page.contentView)
             )
         }
-        if (key.startsWith("s-")) {
+        if (key.startsWith("starred-")) {
+            dispatch(selectCollection(state.page.contentView))
+        } else if (key.startsWith("auto-")) {
+            const visibleSources = Object.values(state.sources).filter(source =>
+                visible(source.sid)
+            )
+            const folder = sidebarGroups(
+                state.groups,
+                visibleSources
+            ).folders.find(group => group.key === key)
+            if (folder)
+                dispatch(selectSources(folder.sids, key, folder.name, true))
+            else if (state.page.contentView === "all")
+                dispatch(selectAllArticles(true))
+            else
+                dispatch(
+                    selectSources(
+                        visibleSources.map(source => source.sid),
+                        `category-${state.page.contentView}`,
+                        intl.get(`contentView.${state.page.contentView}`),
+                        true
+                    )
+                )
+        } else if (key.startsWith("s-")) {
             const sid = Number(key.slice(2))
             const source = state.sources[sid]
             if (
@@ -174,8 +261,14 @@ export function refreshSourceSelection(): AppThunk {
                     true
                 )
             )
-        } else if (key.startsWith("g-")) {
-            const group = state.groups[Number(key.slice(2))]
+        } else if (key.startsWith("folder-") || key.startsWith("g-")) {
+            const group = key.startsWith("folder-")
+                ? state.groups.find(
+                      group =>
+                          group.isMultiple &&
+                          group.name === decodeURIComponent(key.slice(7))
+                  )
+                : state.groups[Number(key.slice(2))]
             if (group) {
                 dispatch(
                     selectSources(
@@ -218,6 +311,16 @@ export function setViewConfigs(configs: ViewConfigs): AppThunk {
             type: "SET_VIEW_CONFIGS",
             configs: configs,
         })
+    }
+}
+
+export function setMediaLayout(
+    view: SourceCategory,
+    layout: MediaLayout
+): AppThunk<Promise<void>> {
+    return async dispatch => {
+        await globalThis.settings.setMediaLayout(view, layout)
+        dispatch({ type: SET_MEDIA_LAYOUT, view, layout })
     }
 }
 
@@ -328,7 +431,7 @@ const applyFilterDone = (filter: FeedFilter): PageActionTypes => ({
 function applyFilter(filter: FeedFilter): AppThunk {
     return (dispatch, getState) => {
         const oldFilterType = getState().page.filter.type
-        if (filter.type !== oldFilterType)
+        if (filter.type !== oldFilterType && !getState().page.collection)
             globalThis.settings.setFilterType(filter.type)
         dispatch(applyFilterDone(filter))
         dispatch(initFeeds(true))
@@ -340,6 +443,7 @@ export function switchFilter(filter: FilterType): AppThunk {
         let oldFilter = getState().page.filter
         let oldType = oldFilter.type
         let newType = filter | (oldType & FilterType.Toggles)
+        if (getState().page.collection) newType &= ~FilterType.ShowNotStarred
         if (oldType != newType) {
             dispatch(
                 applyFilter({
@@ -374,6 +478,16 @@ export function performSearch(query: string): AppThunk {
 }
 
 export class PageState {
+    mediaLayouts = {
+        [SourceCategory.Pictures]: globalThis.settings.getMediaLayout(
+            SourceCategory.Pictures
+        ),
+        [SourceCategory.Videos]: globalThis.settings.getMediaLayout(
+            SourceCategory.Videos
+        ),
+    }
+    collection = false
+    previousFilter: FeedFilter = null
     contentView: ContentView = "all"
     viewType = globalThis.settings.getDefaultView()
     viewConfigs = globalThis.settings.getViewConfigs(
@@ -391,6 +505,20 @@ export function pageReducer(
     action: PageActionTypes | SourceActionTypes | FeedActionTypes
 ): PageState {
     switch (action.type) {
+        case SET_MEDIA_LAYOUT:
+            return {
+                ...state,
+                mediaLayouts: {
+                    ...state.mediaLayouts,
+                    [action.view]: action.layout,
+                },
+            }
+        case SET_COLLECTION:
+            return {
+                ...state,
+                collection: action.active,
+                previousFilter: action.active ? action.previousFilter : null,
+            }
         case SWITCH_CONTENT_VIEW:
             return { ...state, contentView: action.contentView, itemId: null }
         case SELECT_PAGE:

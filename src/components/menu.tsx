@@ -2,6 +2,7 @@ import * as React from "react"
 import { useEffect, useState } from "react"
 import intl from "react-intl-universal"
 import { Icon } from "@fluentui/react"
+import { makeStyles, mergeClasses } from "@griffel/react"
 import {
     Apps24Regular,
     Chat24Regular,
@@ -10,7 +11,7 @@ import {
     Video24Regular,
 } from "@fluentui/react-icons"
 import { ContentView, SourceCategory } from "../schema-types"
-import { addSource, RSSSource } from "../scripts/models/source"
+import { addSource, RSSSource, updateSource } from "../scripts/models/source"
 import { initFeeds } from "../scripts/models/feed"
 import { useAppDispatch, useAppSelector } from "../scripts/reducer"
 import {
@@ -18,9 +19,16 @@ import {
     openSourceMenu,
     toggleSettings,
 } from "../scripts/models/app"
-import { toggleGroupExpansion } from "../scripts/models/group"
+import {
+    toggleGroupExpansion,
+    moveToNamedGroup,
+    reorderSourceGroups,
+} from "../scripts/models/group"
+import { sidebarGroups } from "../scripts/sidebar-groups"
 import {
     selectAllArticles,
+    selectCollection,
+    refreshSourceSelection,
     selectSources,
     switchContentView,
 } from "../scripts/models/page"
@@ -54,8 +62,37 @@ const label = (view: ContentView) =>
         ? intl.get("allArticles") || fallbackLabels.all
         : intl.get(`contentView.${view}`) || fallbackLabels[view]
 
+const useStyles = makeStyles({
+    drop: {
+        outline: "2px solid var(--primary)",
+        backgroundColor: "var(--neutralLight)",
+    },
+    toast: {
+        padding: "10px",
+        fontSize: "12px",
+        backgroundColor: "var(--neutralLighterAlt)",
+        display: "flex",
+        alignItems: "center",
+        gap: "8px",
+    },
+    star: { color: "#d99500" },
+    row: { "cursor": "grab", ":active": { cursor: "grabbing" } },
+})
+
 export const Menu: React.FC = () => {
     const dispatch = useAppDispatch()
+    const classes = useStyles()
+    const [dragSid, setDragSid] = useState<number>(null)
+    const [dropKey, setDropKey] = useState("")
+    const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+    const [notice, setNotice] =
+        useState<{ text: string; undo: () => void }>(null)
+    const [moving, setMoving] = useState(false)
+    useEffect(() => {
+        if (!notice) return
+        const timer = setTimeout(() => setNotice(null), 8000)
+        return () => clearTimeout(timer)
+    }, [notice])
     const ready = useAppSelector(s => s.app.sourceInit)
     const sources = useAppSelector(s => s.sources)
     const groups = useAppSelector(s => s.groups)
@@ -88,7 +125,7 @@ export const Menu: React.FC = () => {
             (view === "all" ||
                 (source.category || SourceCategory.Articles) === view)
     )
-    const visibleIds = new Set(visible.map(source => source.sid))
+    const { folders, singles } = sidebarGroups(groups, visible)
     const unread = visible.reduce(
         (total, source) => total + source.unreadCount,
         0
@@ -127,6 +164,105 @@ export const Menu: React.FC = () => {
         dispatch(initFeeds())
     }
 
+    const dropHandlers = (
+        key: string,
+        target: { view?: SourceCategory; name?: string; sids?: number[] }
+    ) => ({
+        onDragOver: (event: React.DragEvent) => {
+            if (dragSid === null || moving) return
+            event.preventDefault()
+            event.dataTransfer.dropEffect = "move"
+            setDropKey(key)
+        },
+        onDragLeave: (event: React.DragEvent) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node))
+                setDropKey("")
+        },
+        onDrop: async (event: React.DragEvent) => {
+            event.preventDefault()
+            setDropKey("")
+            if (dragSid === null || moving) return
+            const original = sources[dragSid]
+            if (!original || (target.view && original.category === target.view))
+                return
+            setMoving(true)
+            const oldGroups = groups
+            try {
+                if (target.view)
+                    await dispatch(
+                        updateSource({ ...original, category: target.view })
+                    )
+                else
+                    dispatch(
+                        moveToNamedGroup(target.name, [
+                            ...(target.sids || []),
+                            original.sid,
+                        ])
+                    )
+                const expectedGroups = dispatch(
+                    (_, getState) => getState().groups
+                )
+                dispatch(refreshSourceSelection())
+                await dispatch(initFeeds(true))
+                setNotice({
+                    text: intl.get("subscriptions.moved", {
+                        name: target.name || label(target.view),
+                    }),
+                    undo: () => {
+                        setNotice(null)
+                        void dispatch(async (dispatch, getState) => {
+                            const latest = getState().sources[original.sid]
+                            if (!latest) return
+                            if (target.view && latest.category === target.view)
+                                await dispatch(
+                                    updateSource({
+                                        ...latest,
+                                        category: original.category,
+                                    })
+                                )
+                            if (
+                                !target.view &&
+                                getState().groups === expectedGroups
+                            )
+                                dispatch(reorderSourceGroups(oldGroups))
+                            dispatch(refreshSourceSelection())
+                            await dispatch(initFeeds(true))
+                        })
+                    },
+                })
+            } catch (error) {
+                globalThis.utils.showErrorBox(
+                    intl.get("sources.edit"),
+                    String(error)
+                )
+            } finally {
+                setMoving(false)
+                setDragSid(null)
+            }
+        },
+    })
+    const renderSource = (sid: number, nested = false) => (
+        <SourceRow
+            key={sid}
+            source={sources[sid]}
+            active={selected === `s-${sid}`}
+            nested={nested}
+            styleClass={classes.row}
+            onDragStart={event => {
+                event.dataTransfer.effectAllowed = "move"
+                event.dataTransfer.setData("text/plain", String(sid))
+                setDragSid(sid)
+                setNotice(null)
+            }}
+            onDragEnd={() => {
+                setDragSid(null)
+                setDropKey("")
+            }}
+            onClick={() => selectSource(sources[sid])}
+            onContextMenu={event => dispatch(openSourceMenu(sid, event))}
+        />
+    )
+
     const submitSource = async (event: React.FormEvent) => {
         event.preventDefault()
         if (!url.trim() || submitting) return
@@ -149,7 +285,8 @@ export const Menu: React.FC = () => {
                 selectSources(
                     [...categorySources, sid],
                     `category-${category}`,
-                    label(category)
+                    label(category),
+                    true
                 )
             )
             dispatch(initFeeds())
@@ -206,7 +343,13 @@ export const Menu: React.FC = () => {
                         title={label(tab)}
                         data-view={tab}
                         aria-selected={view === tab}
-                        className={view === tab ? "active" : ""}
+                        className={mergeClasses(
+                            view === tab ? "active" : "",
+                            dropKey === `view-${tab}` && classes.drop
+                        )}
+                        {...(tab === "all"
+                            ? {}
+                            : dropHandlers(`view-${tab}`, { view: tab }))}
                         onClick={() => selectView(tab)}
                         onKeyDown={event => {
                             if (
@@ -247,88 +390,115 @@ export const Menu: React.FC = () => {
                 <div className="modern-sidebar-section">
                     {intl.get("menu.subscriptions")}
                 </div>
-                {groups.map((group, index) => {
-                    const members = group.sids
-                        .filter(sid => visibleIds.has(sid))
-                        .map(sid => sources[sid])
-                    if (!members.length) return null
-                    if (!group.isMultiple) {
-                        const source = members[0]
-                        return (
-                            <SourceRow
-                                key={source.sid}
-                                source={source}
-                                active={selected === `s-${source.sid}`}
-                                onClick={() => selectSource(source)}
-                                onContextMenu={event =>
-                                    dispatch(openSourceMenu(source.sid, event))
-                                }
-                            />
-                        )
-                    }
+                <button
+                    type="button"
+                    className={`modern-source-row ${
+                        selected === `starred-${view}` ? "active" : ""
+                    }`}
+                    onClick={() => {
+                        dispatch(selectCollection(view))
+                        dispatch(initFeeds())
+                    }}>
+                    <Icon
+                        iconName="FavoriteStarFill"
+                        className={classes.star}
+                    />
+                    <span className="modern-source-name">
+                        {intl.get("subscriptions.starred")}
+                    </span>
+                </button>
+                {folders.map(group => {
+                    const expanded =
+                        group.index !== undefined
+                            ? group.expanded
+                            : !collapsed.has(`${view}-${group.key}`)
                     return (
-                        <div key={index}>
-                            <div className="modern-source-row modern-group-row">
+                        <div key={group.key}>
+                            <div
+                                className={mergeClasses(
+                                    "modern-source-row modern-group-row",
+                                    dropKey === group.key && classes.drop
+                                )}
+                                {...dropHandlers(group.key, {
+                                    name: group.name,
+                                    sids: group.domain ? group.sids : [],
+                                })}>
                                 <button
                                     type="button"
                                     aria-label={
-                                        group.expanded ? "Collapse" : "Expand"
+                                        expanded
+                                            ? intl.get("subscriptions.collapse")
+                                            : intl.get("subscriptions.expand")
                                     }
-                                    onClick={() =>
-                                        dispatch(toggleGroupExpansion(index))
-                                    }>
-                                    {group.expanded ? "⌄" : "›"}
+                                    aria-expanded={expanded}
+                                    onClick={() => {
+                                        if (group.index !== undefined)
+                                            dispatch(
+                                                toggleGroupExpansion(
+                                                    group.index
+                                                )
+                                            )
+                                        else
+                                            setCollapsed(previous => {
+                                                const next = new Set(previous)
+                                                const key = `${view}-${group.key}`
+                                                if (next.has(key))
+                                                    next.delete(key)
+                                                else next.add(key)
+                                                return next
+                                            })
+                                    }}>
+                                    {expanded ? "⌄" : "›"}
                                 </button>
                                 <button
                                     type="button"
+                                    className={
+                                        selected === group.key ? "active" : ""
+                                    }
                                     onClick={() => {
                                         dispatch(
                                             selectSources(
-                                                members.map(s => s.sid),
-                                                `g-${index}`,
+                                                group.sids,
+                                                group.key,
                                                 group.name
                                             )
                                         )
                                         dispatch(initFeeds())
                                     }}
-                                    onContextMenu={event =>
-                                        dispatch(
-                                            openGroupMenu(
-                                                members.map(s => s.sid),
-                                                event
-                                            )
-                                        )
+                                    onContextMenu={
+                                        group.index === undefined
+                                            ? undefined
+                                            : event =>
+                                                  dispatch(
+                                                      openGroupMenu(
+                                                          group.sids,
+                                                          event
+                                                      )
+                                                  )
                                     }>
                                     {group.name}
                                 </button>
                             </div>
-                            {group.expanded &&
-                                members.map(source => (
-                                    <SourceRow
-                                        key={source.sid}
-                                        source={source}
-                                        active={selected === `s-${source.sid}`}
-                                        nested
-                                        onClick={() => selectSource(source)}
-                                        onContextMenu={event =>
-                                            dispatch(
-                                                openSourceMenu(
-                                                    source.sid,
-                                                    event
-                                                )
-                                            )
-                                        }
-                                    />
-                                ))}
+                            {expanded &&
+                                group.sids.map(sid => renderSource(sid, true))}
                         </div>
                     )
                 })}
+                {singles.map(sid => renderSource(sid))}
                 {!visible.length && (
                     <p className="modern-sidebar-empty">
                         {intl.get("article.empty")}
                     </p>
                 )}
             </div>
+            {notice && (
+                <div className={classes.toast} role="status">
+                    <span>{notice.text}</span>
+                    <button type="button" onClick={notice.undo}>
+                        {intl.get("subscriptions.undo")}
+                    </button>
+                </div>
+            )}
             {adding && (
                 <div
                     className="modern-dialog-backdrop"
@@ -400,18 +570,45 @@ const SourceRow: React.FC<{
     source: RSSSource
     active: boolean
     nested?: boolean
+    styleClass?: string
+    onDragStart: (event: React.DragEvent) => void
+    onDragEnd: () => void
     onClick: () => void
     onContextMenu: (event: React.MouseEvent) => void
-}> = ({ source, active, nested, onClick, onContextMenu }) => (
+}> = ({
+    source,
+    active,
+    nested,
+    styleClass,
+    onDragStart,
+    onDragEnd,
+    onClick,
+    onContextMenu,
+}) => (
     <button
         type="button"
-        className={`modern-source-row ${active ? "active" : ""} ${
-            nested ? "nested" : ""
-        }`}
+        className={mergeClasses(
+            `modern-source-row ${active ? "active" : ""} ${
+                nested ? "nested" : ""
+            }`,
+            styleClass
+        )}
+        draggable
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
         onClick={onClick}
         onContextMenu={onContextMenu}>
-        {source.iconurl && (
-            <img className="modern-source-icon" src={source.iconurl} alt="" />
+        {source.iconurl ? (
+            <img
+                className="modern-source-icon"
+                src={source.iconurl}
+                alt=""
+                onError={event => {
+                    event.currentTarget.style.display = "none"
+                }}
+            />
+        ) : (
+            <Icon iconName="RssFeed" />
         )}
         <span className="modern-source-name">{source.name}</span>
         {source.unreadCount > 0 && <small>{source.unreadCount}</small>}

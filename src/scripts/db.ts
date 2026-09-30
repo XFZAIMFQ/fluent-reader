@@ -5,7 +5,7 @@ import { RSSSource } from "./models/source"
 import { RSSItem } from "./models/item"
 import { SourceCategory } from "../schema-types"
 
-const sdbSchema = lf.schema.create("sourcesDB", 5)
+const sdbSchema = lf.schema.create("sourcesDB", 6)
 sdbSchema
     .createTable("sources")
     .addColumn("sid", lf.Type.INTEGER)
@@ -22,7 +22,19 @@ sdbSchema
     .addColumn("hidden", lf.Type.BOOLEAN)
     .addColumn("category", lf.Type.STRING)
     .addColumn("private", lf.Type.BOOLEAN)
-    .addNullable(["iconurl", "serviceRef", "rules"])
+    .addColumn("siteUrl", lf.Type.STRING)
+    .addColumn("feedIcon", lf.Type.STRING)
+    .addColumn("iconOrigin", lf.Type.STRING)
+    .addColumn("autoGroup", lf.Type.BOOLEAN)
+    .addColumn("metadataVersion", lf.Type.INTEGER)
+    .addNullable([
+        "iconurl",
+        "serviceRef",
+        "rules",
+        "siteUrl",
+        "feedIcon",
+        "iconOrigin",
+    ])
     .addIndex("idxURL", ["url"], true)
 
 const idbSchema = lf.schema.create("itemsDB", 2)
@@ -71,6 +83,13 @@ async function onUpgradeSourceDB(rawDb: lf.raw.BackStore) {
     }
     if (version < 5) {
         await rawDb.addTableColumn("sources", "private", false)
+    }
+    if (version < 6) {
+        await rawDb.addTableColumn("sources", "siteUrl", "")
+        await rawDb.addTableColumn("sources", "feedIcon", "")
+        await rawDb.addTableColumn("sources", "iconOrigin", "")
+        await rawDb.addTableColumn("sources", "autoGroup", true)
+        await rawDb.addTableColumn("sources", "metadataVersion", 0)
     }
 }
 
@@ -126,6 +145,11 @@ async function migrateNeDB() {
             doc.hidden = false
             doc.category = SourceCategory.Articles
             doc.private = false
+            doc.siteUrl = ""
+            doc.feedIcon = ""
+            doc.iconOrigin = ""
+            doc.autoGroup = true
+            doc.metadataVersion = 0
             return sources.createRow(doc)
         })
         const iRows = itemDocs.map(doc => {

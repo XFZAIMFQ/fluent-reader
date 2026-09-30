@@ -231,5 +231,19 @@
         "pacHint": "För Socks-proxyservrar rekommenderas att PAC returnerar \"SOCKS5\" för DNS på proxysidan. Om du stänger av proxyn krävs omstart.",
         "fetchInterval": "Automatiskt hämtningsintervall",
         "never": "Aldrig"
+    },
+    "subscriptions": {
+        "starred": "Favorites",
+        "autoGroup": "Automatically group by website",
+        "createOnSave": "Group “{name}” will be created when you save.",
+        "refreshIcon": "Re-detect website icon",
+        "moved": "Moved to {name}",
+        "undo": "Undo",
+        "collapse": "Collapse group",
+        "expand": "Expand group",
+        "layout": "Card layout",
+        "columns": "{count} columns",
+        "autoColumns": "Automatic columns",
+        "imageOnly": "Images only"
     }
 }

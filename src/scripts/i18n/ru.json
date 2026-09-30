@@ -237,5 +237,19 @@
         "pacHint": "Для Socks прокси рекомендуется, чтобы PAC возвращал \"SOCKS5\" для DNS на стороне прокси. Выключение прокси требует перезапуска.",
         "fetchInterval": "Интервал автоматического обновления",
         "never": "Никогда"
+    },
+    "subscriptions": {
+        "starred": "Favorites",
+        "autoGroup": "Automatically group by website",
+        "createOnSave": "Group “{name}” will be created when you save.",
+        "refreshIcon": "Re-detect website icon",
+        "moved": "Moved to {name}",
+        "undo": "Undo",
+        "collapse": "Collapse group",
+        "expand": "Expand group",
+        "layout": "Card layout",
+        "columns": "{count} columns",
+        "autoColumns": "Automatic columns",
+        "imageOnly": "Images only"
     }
 }

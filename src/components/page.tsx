@@ -155,11 +155,10 @@ const Page: React.FC = () => {
                     style={{ width: listWidth }}>
                     <div className="modern-list-heading">
                         <strong>
-                            {menuKey.startsWith("s-")
-                                ? pageTitle
-                                : contentView === "all"
-                                ? intl.get("allArticles")
-                                : intl.get("contentView.articles")}
+                            {pageTitle ||
+                                (contentView === "all"
+                                    ? intl.get("allArticles")
+                                    : intl.get("contentView.articles"))}
                         </strong>
                         <FeedToolbar />
                     </div>

@@ -238,5 +238,19 @@
         "pacHint": "Dla serwerów proxy Socks, zalecane jest aby PAC zwrócił \"SOCKS5\" dla DNS po stronie proxy. Wyłączenie serwera pośredniczącego wymaga restartu.",
         "fetchInterval": "Częstotliwość automatycznego pobierania danych",
         "never": "Nigdy"
+    },
+    "subscriptions": {
+        "starred": "Favorites",
+        "autoGroup": "Automatically group by website",
+        "createOnSave": "Group “{name}” will be created when you save.",
+        "refreshIcon": "Re-detect website icon",
+        "moved": "Moved to {name}",
+        "undo": "Undo",
+        "collapse": "Collapse group",
+        "expand": "Expand group",
+        "layout": "Card layout",
+        "columns": "{count} columns",
+        "autoColumns": "Automatic columns",
+        "imageOnly": "Images only"
     }
 }

@@ -35,6 +35,11 @@ export const enum SourceCategory {
 
 export type ContentView = "all" | SourceCategory
 
+export interface MediaLayout {
+    columns: number
+    imageOnly: boolean
+}
+
 export interface SubscribeLinkRequest {
     url: string
     view: SourceCategory
@@ -132,4 +137,5 @@ export type SchemaTypes = {
     listViewConfigs: ViewConfigs
     useNeDB: boolean
     privacyMode: boolean
+    mediaLayouts: Partial<Record<SourceCategory, MediaLayout>>
 }

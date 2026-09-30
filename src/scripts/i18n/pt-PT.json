@@ -237,5 +237,19 @@
         "pacHint": "Para proxies Socks, é recomendado para o PAC retornar \"SOCKS5\" para o proxy-side DNS. Desligar o proxy requer um reinicio.",
         "fetchInterval": "Intervalo de atualização automática",
         "never": "Nunca"
+    },
+    "subscriptions": {
+        "starred": "Favorites",
+        "autoGroup": "Automatically group by website",
+        "createOnSave": "Group “{name}” will be created when you save.",
+        "refreshIcon": "Re-detect website icon",
+        "moved": "Moved to {name}",
+        "undo": "Undo",
+        "collapse": "Collapse group",
+        "expand": "Expand group",
+        "layout": "Card layout",
+        "columns": "{count} columns",
+        "autoColumns": "Automatic columns",
+        "imageOnly": "Images only"
     }
 }

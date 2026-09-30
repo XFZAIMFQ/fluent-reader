@@ -48,7 +48,13 @@ const mapDispatchToProps = (dispatch: AppDispatch) => {
         updateSourceIcon: async (source: RSSSource, iconUrl: string) => {
             dispatch(saveSettings())
             if (await validateFavicon(iconUrl)) {
-                dispatch(updateSource({ ...source, iconurl: iconUrl }))
+                dispatch(
+                    updateSource({
+                        ...source,
+                        iconurl: iconUrl,
+                        iconOrigin: "manual",
+                    })
+                )
             } else {
                 window.utils.showErrorBox(intl.get("sources.badIcon"), "")
             }

@@ -21,6 +21,8 @@ import { saveSettings } from "./app"
 import { SourceRule } from "./rule"
 import { fixBrokenGroups } from "./group"
 import { ContentView, SourceCategory } from "../../schema-types"
+import { sourceMetadata, httpUrl } from "../source-metadata"
+import { validateFavicon } from "../utils"
 
 export const enum SourceOpenTarget {
     Local,
@@ -50,6 +52,11 @@ export class RSSSource {
     hidden: boolean
     category: SourceCategory
     private: boolean
+    siteUrl: string = ""
+    feedIcon: string = ""
+    iconOrigin: string = ""
+    autoGroup: boolean = true
+    metadataVersion: number = 0
 
     constructor(url: string, name: string = null) {
         this.url = url
@@ -65,6 +72,8 @@ export class RSSSource {
 
     static async fetchMetaData(source: RSSSource) {
         let feed = await parseRSS(source.url)
+        Object.assign(source, sourceMetadata(source.url, feed))
+        source.metadataVersion = 1
         if (!source.name) {
             if (feed.title) source.name = feed.title.trim()
             source.name = source.name || intl.get("sources.untitled")
@@ -440,25 +449,74 @@ export function updateFavicon(
         const initSources = getState().sources
         if (!sids) {
             sids = Object.values(initSources)
-                .filter(s => s.iconurl === undefined)
+                .filter(s => !s.metadataVersion || !s.iconurl)
                 .map(s => s.sid)
         } else {
             sids = sids.filter(sid => sid in initSources)
         }
-        const promises = sids.map(async sid => {
-            const url = initSources[sid].url
-            let favicon = (await fetchFavicon(url)) || ""
-            const source = getState().sources[sid]
-            if (
-                source &&
-                source.url === url &&
-                (force || source.iconurl === undefined)
-            ) {
-                source.iconurl = favicon
-                await dispatch(updateSource(source))
-            }
-        })
-        await Promise.all(promises)
+        // Bound startup backfill requests when importing a large subscription list.
+        const pending = [...sids]
+        await Promise.all(
+            Array.from({ length: Math.min(4, pending.length) }, async () => {
+                while (pending.length) {
+                    const sid = pending.shift()
+                    const original = getState().sources[sid]
+                    if (!original) continue
+                    try {
+                        let metadata = {
+                            siteUrl: original.siteUrl,
+                            feedIcon: original.feedIcon,
+                        }
+                        if (!original.metadataVersion || force) {
+                            metadata = sourceMetadata(
+                                original.url,
+                                await parseRSS(original.url)
+                            )
+                        }
+                        let iconOrigin = original.iconOrigin
+                        if (!iconOrigin && original.iconurl) {
+                            const iconUrl = httpUrl(original.iconurl)
+                            const origin = iconUrl && new URL(iconUrl).origin
+                            iconOrigin =
+                                origin &&
+                                new URL(original.url).origin === origin &&
+                                (/favicon/i.test(iconUrl) ||
+                                    new URL(metadata.siteUrl).origin !== origin)
+                                    ? "auto"
+                                    : "manual"
+                        }
+                        let favicon = original.iconurl || ""
+                        if (iconOrigin !== "manual") {
+                            favicon =
+                                metadata.feedIcon &&
+                                (await validateFavicon(metadata.feedIcon))
+                                    ? metadata.feedIcon
+                                    : (await fetchFavicon(metadata.siteUrl)) ||
+                                      ""
+                            iconOrigin = "auto"
+                        }
+                        const latest = getState().sources[sid]
+                        if (
+                            latest &&
+                            latest.url === original.url &&
+                            latest.iconurl === original.iconurl
+                        ) {
+                            await dispatch(
+                                updateSource({
+                                    ...latest,
+                                    ...metadata,
+                                    metadataVersion: 1,
+                                    iconOrigin,
+                                    iconurl: favicon,
+                                })
+                            )
+                        }
+                    } catch {
+                        // A metadata failure must not prevent loading other subscriptions.
+                    }
+                }
+            })
+        )
     }
 }
 

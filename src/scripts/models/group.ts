@@ -82,6 +82,7 @@ export function createSourceGroupDone(
 
 export function createSourceGroup(name: string): AppThunk<number> {
     return (dispatch, getState) => {
+        name = name.trim()
         let groups = getState().groups
         for (let i = 0; i < groups.length; i += 1) {
             const g = groups[i]
@@ -94,6 +95,16 @@ export function createSourceGroup(name: string): AppThunk<number> {
         groups = getState().groups
         window.settings.saveGroups(groups)
         return groups.length - 1
+    }
+}
+
+export function moveToNamedGroup(name: string, sids: number[]): AppThunk {
+    return (dispatch, getState) => {
+        for (const sid of new Set(sids)) {
+            const index = dispatch(createSourceGroup(name))
+            if (!getState().groups[index].sids.includes(sid))
+                dispatch(addSourceToGroup(index, sid))
+        }
     }
 }
 

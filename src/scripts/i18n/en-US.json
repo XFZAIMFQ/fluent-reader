@@ -1,6 +1,8 @@
 {
     "allArticles": "All articles",
-    "status": { "unread": "unread" },
+    "status": {
+        "unread": "unread"
+    },
     "articleSelectToRead": "Select an article to read",
     "contentView": {
         "all": "All",
@@ -275,5 +277,19 @@
         "pacHint": "For Socks proxies, it is recommended for PAC to return \"SOCKS5\" for proxy-side DNS. Turning off proxy requires restart.",
         "fetchInterval": "Automatic fetch interval",
         "never": "Never"
+    },
+    "subscriptions": {
+        "starred": "Favorites",
+        "autoGroup": "Automatically group by website",
+        "createOnSave": "Group “{name}” will be created when you save.",
+        "refreshIcon": "Re-detect website icon",
+        "moved": "Moved to {name}",
+        "undo": "Undo",
+        "collapse": "Collapse group",
+        "expand": "Expand group",
+        "layout": "Card layout",
+        "columns": "{count} columns",
+        "autoColumns": "Automatic columns",
+        "imageOnly": "Images only"
     }
 }

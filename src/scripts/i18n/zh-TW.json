@@ -252,5 +252,19 @@
         "pacHint": "對於Socks代理建議PAC返回“SOCKS5”以啟用代理端解析。關閉代理需重啟應用後生效。",
         "fetchInterval": "自動抓取頻率",
         "never": "從不"
+    },
+    "subscriptions": {
+        "starred": "收藏",
+        "autoGroup": "自動按網站分組",
+        "createOnSave": "儲存時將建立「{name}」分組。",
+        "refreshIcon": "重新識別網站圖示",
+        "moved": "已移到{name}",
+        "undo": "復原",
+        "collapse": "收合分組",
+        "expand": "展開分組",
+        "layout": "卡片版面",
+        "columns": "每行 {count} 個",
+        "autoColumns": "自動欄數",
+        "imageOnly": "僅顯示圖片"
     }
 }

@@ -238,5 +238,19 @@
         "pacHint": "U proxy serverů Socks se doporučuje, aby PAC vracel \"SOCKS5\" pro DNS na straně proxy serveru. Vypnutí proxy vyžaduje restart.",
         "fetchInterval": "Automatický interval načítání",
         "never": "Nikdy"
+    },
+    "subscriptions": {
+        "starred": "Favorites",
+        "autoGroup": "Automatically group by website",
+        "createOnSave": "Group “{name}” will be created when you save.",
+        "refreshIcon": "Re-detect website icon",
+        "moved": "Moved to {name}",
+        "undo": "Undo",
+        "collapse": "Collapse group",
+        "expand": "Expand group",
+        "layout": "Card layout",
+        "columns": "{count} columns",
+        "autoColumns": "Automatic columns",
+        "imageOnly": "Images only"
     }
 }

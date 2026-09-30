@@ -231,5 +231,19 @@
         "pacHint": "Для проксі Socks рекомендується, щоб PAC повертав \"SOCKS5\" для DNS на стороні проксі. Для відключення проксі потрібне перезавантаження.",
         "fetchInterval": "Інтервал автоматичної вибірки",
         "never": "Ніколи"
+    },
+    "subscriptions": {
+        "starred": "Favorites",
+        "autoGroup": "Automatically group by website",
+        "createOnSave": "Group “{name}” will be created when you save.",
+        "refreshIcon": "Re-detect website icon",
+        "moved": "Moved to {name}",
+        "undo": "Undo",
+        "collapse": "Collapse group",
+        "expand": "Expand group",
+        "layout": "Card layout",
+        "columns": "{count} columns",
+        "autoColumns": "Automatic columns",
+        "imageOnly": "Images only"
     }
 }

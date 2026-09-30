@@ -3,7 +3,7 @@ import { ThunkAction, ThunkDispatch } from "redux-thunk"
 import { AnyAction } from "redux"
 import { RootState } from "./reducer"
 import Parser from "rss-parser"
-import Url from "url"
+import { httpUrl } from "./source-metadata"
 import { SearchEngines } from "../schema-types"
 
 export enum ActionStatus {
@@ -24,6 +24,7 @@ export type AppDispatch = ThunkDispatch<RootState, undefined, AnyAction>
 
 const rssParser = new Parser({
     customFields: {
+        feed: ["icon", "logo"],
         item: [
             "thumb",
             "image",
@@ -101,23 +102,26 @@ export const domParser = new DOMParser()
 
 export async function fetchFavicon(url: string) {
     try {
-        url = url.split("/").slice(0, 3).join("/")
-        let result = await fetch(url, { credentials: "omit" })
-        if (result.ok) {
-            let html = await result.text()
+        url = new URL(url).origin
+        let result = await window.utils.fetchFeed(url)
+        if (result.status >= 200 && result.status < 300) {
+            let html = await decodeFetchResponse(
+                new Response(result.body, {
+                    headers: { "content-type": result.contentType },
+                }),
+                true
+            )
             let dom = domParser.parseFromString(html, "text/html")
             let links = dom.getElementsByTagName("link")
             for (let link of links) {
                 let rel = link.getAttribute("rel")
                 if (
-                    (rel === "icon" || rel === "shortcut icon") &&
+                    (rel?.split(/\s+/).includes("icon") ||
+                        rel === "apple-touch-icon") &&
                     link.hasAttribute("href")
                 ) {
-                    let href = link.getAttribute("href")
-                    let parsedUrl = Url.parse(url)
-                    if (href.startsWith("//")) return parsedUrl.protocol + href
-                    else if (href.startsWith("/")) return url + href
-                    else return href
+                    let href = httpUrl(link.getAttribute("href"), url + "/")
+                    if (href && (await validateFavicon(href))) return href
                 }
             }
         }
@@ -135,12 +139,8 @@ export async function fetchFavicon(url: string) {
 export async function validateFavicon(url: string) {
     let flag = false
     try {
-        const result = await fetch(url, { credentials: "omit" })
-        if (
-            result.status == 200 &&
-            result.headers.has("Content-Type") &&
-            result.headers.get("Content-Type").startsWith("image")
-        ) {
+        const result = await window.utils.fetchFeed(httpUrl(url))
+        if (result.status == 200 && result.contentType.startsWith("image/")) {
             flag = true
         }
     } finally {

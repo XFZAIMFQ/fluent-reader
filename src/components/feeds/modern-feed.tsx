@@ -1,6 +1,8 @@
 import * as React from "react"
 import { Icon } from "@fluentui/react"
 import { openItemMenu } from "../../scripts/models/app"
+import { useEffect, useRef, useState } from "react"
+import { makeStyles, mergeClasses } from "@griffel/react"
 import intl from "react-intl-universal"
 import { ContentView, SourceCategory } from "../../schema-types"
 import { loadMore } from "../../scripts/models/feed"
@@ -16,11 +18,79 @@ import { useAppDispatch, useAppSelector } from "../../scripts/reducer"
 import Time from "../utils/time"
 import FeedToolbar from "./feed-toolbar"
 
+const useStyles = makeStyles({
+    pictures: {
+        "& .modern-feed-items": { columnGap: "8px", rowGap: "12px" },
+    },
+    videos: {
+        "& .modern-feed-items": { columnGap: "12px", rowGap: "16px" },
+    },
+    media: {
+        "& .modern-entry": {
+            maxWidth: "none",
+            padding: "3px",
+            borderRadius: "8px",
+        },
+        "& .modern-entry-body": { padding: "5px 2px 0" },
+        "& .modern-entry h2": { fontSize: "12px" },
+        "& .modern-entry-meta": {
+            fontSize: "11px",
+            gap: "4px",
+            marginTop: "3px",
+        },
+        "& .modern-entry-meta .time": { marginLeft: "0", flexShrink: 0 },
+        "& .modern-entry-meta > span": {
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+        },
+    },
+    imageOnly: {
+        "& .modern-entry-body": { display: "none" },
+    },
+    missingImage: {
+        display: "grid",
+        placeItems: "center",
+        height: "100%",
+        color: "var(--neutralSecondary)",
+    },
+})
+
 const ModernFeed: React.FC<{ feedId: string; view: ContentView }> = ({
     feedId,
     view,
 }) => {
     const dispatch = useAppDispatch()
+    const classes = useStyles()
+    const layout = useAppSelector(s => s.page.mediaLayouts[view])
+    const scrollRef = useRef<HTMLDivElement>(null)
+    const [width, setWidth] = useState(0)
+    const isMediaView =
+        view === SourceCategory.Pictures || view === SourceCategory.Videos
+    useEffect(() => {
+        const element = scrollRef.current
+        if (!element || !isMediaView) return
+        const observer = new ResizeObserver(() => {
+            const styles = getComputedStyle(element)
+            setWidth(
+                element.clientWidth -
+                    parseFloat(styles.paddingLeft) -
+                    parseFloat(styles.paddingRight)
+            )
+        })
+        observer.observe(element)
+        return () => observer.disconnect()
+    }, [view])
+    const gap = view === SourceCategory.Pictures ? 8 : 12
+    const maximumColumns = Math.max(1, Math.floor((width + gap) / (180 + gap)))
+    const automaticColumns = Math.min(
+        6,
+        Math.max(1, Math.floor((width + gap) / (280 + gap)))
+    )
+    const columns = Math.min(
+        layout?.columns || automaticColumns,
+        maximumColumns
+    )
     const feed = useAppSelector(s => s.feeds[feedId])
     const items = useAppSelector(s =>
         s.feeds[feedId]
@@ -60,21 +130,36 @@ const ModernFeed: React.FC<{ feedId: string; view: ContentView }> = ({
     }
 
     return (
-        <div className={`modern-feed modern-feed-${view}`}>
+        <div
+            className={mergeClasses(
+                `modern-feed modern-feed-${view}`,
+                isMediaView && classes.media,
+                view === SourceCategory.Pictures && classes.pictures,
+                view === SourceCategory.Videos && classes.videos,
+                view === SourceCategory.Pictures &&
+                    layout.imageOnly &&
+                    classes.imageOnly
+            )}>
             <header className="modern-feed-heading">
                 {selectedSource?.iconurl && (
                     <img src={selectedSource.iconurl} alt="" />
                 )}
                 <h1>
-                    {selectedSource
-                        ? selectedTitle
-                        : intl.get(`contentView.${view}`) || view}
+                    {selectedTitle || intl.get(`contentView.${view}`) || view}
                 </h1>
                 {!selectedSource && <span>{items.length}</span>}
                 <FeedToolbar />
             </header>
-            <div className="modern-feed-scroll">
-                <div className="modern-feed-items">
+            <div className="modern-feed-scroll" ref={scrollRef}>
+                <div
+                    className="modern-feed-items"
+                    style={
+                        isMediaView
+                            ? {
+                                  gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+                              }
+                            : undefined
+                    }>
                     {items.map(item => {
                         const source = sources[item.source]
                         if (!source) return null
@@ -180,13 +265,22 @@ const ModernFeed: React.FC<{ feedId: string; view: ContentView }> = ({
                                     type="button"
                                     className="modern-entry-main"
                                     onClick={() => open(item)}>
-                                    {view === SourceCategory.Pictures && image && (
+                                    {view === SourceCategory.Pictures && (
                                         <div className="modern-picture-frame">
-                                            <img
-                                                className="modern-entry-picture"
-                                                src={image}
-                                                alt=""
-                                            />
+                                            {image ? (
+                                                <img
+                                                    className="modern-entry-picture"
+                                                    src={image}
+                                                    alt=""
+                                                />
+                                            ) : (
+                                                <span
+                                                    className={
+                                                        classes.missingImage
+                                                    }>
+                                                    <Icon iconName="Photo2" />
+                                                </span>
+                                            )}
                                         </div>
                                     )}
                                     {view === SourceCategory.Videos && (

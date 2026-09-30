@@ -1,10 +1,12 @@
 import * as React from "react"
 import intl from "react-intl-universal"
-import { Icon } from "@fluentui/react"
+import { Icon, ContextualMenu } from "@fluentui/react"
+import { useState } from "react"
+import { SourceCategory } from "../../schema-types"
 import { makeStyles, mergeClasses } from "@fluentui/react-components"
 import { fetchItems } from "../../scripts/models/item"
 import { FilterType } from "../../scripts/models/feed"
-import { switchFilter } from "../../scripts/models/page"
+import { switchFilter, setMediaLayout } from "../../scripts/models/page"
 import { openMarkAllMenu } from "../../scripts/models/app"
 import { useAppDispatch, useAppSelector } from "../../scripts/reducer"
 import { FlatButton } from "../utils/FlatButton"
@@ -41,10 +43,72 @@ const FeedToolbar: React.FC = () => {
             s.app.fetchingItems
     )
     const filter = useAppSelector(s => s.page.filter.type)
-    const unreadOnly = (filter & ~FilterType.Toggles) === FilterType.UnreadOnly
+    const view = useAppSelector(s => s.page.contentView)
+    const collection = useAppSelector(s => s.page.collection)
+    const layout = useAppSelector(s => s.page.mediaLayouts[view])
+    const [layoutTarget, setLayoutTarget] = useState<HTMLElement>(null)
+    const unreadOnly = !(filter & FilterType.ShowRead)
 
     return (
         <FlatButtonGroup styleClass={classes.actions}>
+            {(view === SourceCategory.Pictures ||
+                view === SourceCategory.Videos) && (
+                <>
+                    <FlatButton
+                        styleClass={classes.button}
+                        ariaLabel={intl.get("subscriptions.layout")}
+                        onClick={event => setLayoutTarget(event.currentTarget)}>
+                        <Icon iconName="GridViewMedium" />
+                    </FlatButton>
+                    {layoutTarget && (
+                        <ContextualMenu
+                            target={layoutTarget}
+                            onDismiss={() => setLayoutTarget(null)}
+                            items={[
+                                ...[0, 2, 3, 4, 5, 6].map(columns => ({
+                                    key: String(columns),
+                                    text: columns
+                                        ? intl.get("subscriptions.columns", {
+                                              count: columns,
+                                          })
+                                        : intl.get("subscriptions.autoColumns"),
+                                    canCheck: true,
+                                    checked: layout.columns === columns,
+                                    onClick: () => {
+                                        void dispatch(
+                                            setMediaLayout(view, {
+                                                ...layout,
+                                                columns,
+                                            })
+                                        )
+                                    },
+                                })),
+                                ...(view === SourceCategory.Pictures
+                                    ? [
+                                          {
+                                              key: "imageOnly",
+                                              text: intl.get(
+                                                  "subscriptions.imageOnly"
+                                              ),
+                                              canCheck: true,
+                                              checked: layout.imageOnly,
+                                              onClick: () => {
+                                                  void dispatch(
+                                                      setMediaLayout(view, {
+                                                          ...layout,
+                                                          imageOnly:
+                                                              !layout.imageOnly,
+                                                      })
+                                                  )
+                                              },
+                                          },
+                                      ]
+                                    : []),
+                            ]}
+                        />
+                    )}
+                </>
+            )}
             <FlatButton
                 styleClass={classes.button}
                 fetching={fetching}
@@ -69,7 +133,11 @@ const FeedToolbar: React.FC = () => {
                     dispatch(
                         switchFilter(
                             unreadOnly
-                                ? FilterType.Default
+                                ? collection
+                                    ? FilterType.StarredOnly
+                                    : FilterType.Default
+                                : collection
+                                ? FilterType.None
                                 : FilterType.UnreadOnly
                         )
                     )
