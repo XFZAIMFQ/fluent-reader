@@ -1,8 +1,7 @@
 import * as React from "react"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import intl from "react-intl-universal"
 import { makeStyles, mergeClasses } from "@griffel/react"
-import { Combobox, Option } from "@fluentui/react-components"
 import {
     Chat24Regular,
     DocumentText24Regular,
@@ -12,10 +11,7 @@ import {
 import { SourceCategory } from "../schema-types"
 import { closeSourceEditor } from "../scripts/models/app"
 import { initFeeds } from "../scripts/models/feed"
-import {
-    removeSourceFromGroup,
-    moveToNamedGroup,
-} from "../scripts/models/group"
+import { setSourceGrouping, SourceGrouping } from "../scripts/models/group"
 import { getItemMedia } from "../scripts/models/item"
 import { refreshSourceSelection } from "../scripts/models/page"
 import {
@@ -24,6 +20,7 @@ import {
     updateFavicon,
 } from "../scripts/models/source"
 import { useAppDispatch, useAppSelector } from "../scripts/reducer"
+import { SourceGroupPicker } from "./utils/source-group-picker"
 
 const categories = [
     SourceCategory.Articles,
@@ -94,14 +91,6 @@ const useStyles = makeStyles({
         backgroundColor: "var(--white)",
         color: "var(--neutralPrimary)",
         font: "inherit",
-    },
-    groupDropdown: {
-        "minHeight": "38px",
-        "borderRadius": "8px",
-        "backgroundColor": "var(--white)",
-        "color": "var(--neutralPrimary)",
-        "border": "1px solid var(--neutralQuaternaryAlt)",
-        "& input": { color: "inherit" },
     },
     toggle: {
         display: "flex",
@@ -233,19 +222,6 @@ export function SourceEditor() {
     const sid = useAppSelector(state => state.app.sourceEditorSid)
     const source = useAppSelector(state => state.sources[sid])
     const groups = useAppSelector(state => state.groups)
-    const groupOptions = useMemo(
-        () => [
-            { key: -1, text: intl.get("subscriptions.autoGroup") },
-            { key: -2, text: intl.get("sources.ungrouped") },
-            ...groups
-                .filter(group => group.isMultiple)
-                .map(group => ({
-                    key: `group:${group.name}`,
-                    text: group.name,
-                })),
-        ],
-        [groups]
-    )
     const sample = useAppSelector(state =>
         sid === null
             ? null
@@ -253,8 +229,7 @@ export function SourceEditor() {
     )
     const [name, setName] = useState("")
     const [category, setCategory] = useState(SourceCategory.Articles)
-    const [groupIndex, setGroupIndex] = useState(-1)
-    const [groupName, setGroupName] = useState("")
+    const [grouping, setGrouping] = useState<SourceGrouping>({ mode: "auto" })
     const [refreshingIcon, setRefreshingIcon] = useState(false)
     const [privateSource, setPrivateSource] = useState(false)
     const [hidden, setHidden] = useState(false)
@@ -264,18 +239,13 @@ export function SourceEditor() {
         if (!source) return
         setName(source.name || "")
         setCategory(source.category || SourceCategory.Articles)
-        setGroupIndex(
-            groups.findIndex(
-                group => group.isMultiple && group.sids.includes(sid)
-            ) >= 0
-                ? 0
-                : source.autoGroup === false
-                ? -2
-                : -1
+        const group = groups.find(
+            group => group.isMultiple && group.sids.includes(sid)
         )
-        setGroupName(
-            groups.find(group => group.isMultiple && group.sids.includes(sid))
-                ?.name || ""
+        setGrouping(
+            group
+                ? { mode: "manual", name: group.name }
+                : { mode: source.autoGroup === false ? "none" : "auto" }
         )
         setPrivateSource(Boolean(source.private))
         setHidden(Boolean(source.hidden))
@@ -284,7 +254,12 @@ export function SourceEditor() {
     useEffect(() => {
         if (sid === null) return
         const onKeyDown = (event: KeyboardEvent) => {
-            if (event.key === "Escape") dispatch(closeSourceEditor())
+            if (
+                event.key === "Escape" &&
+                !event.defaultPrevented &&
+                !document.querySelector('[role="listbox"]')
+            )
+                dispatch(closeSourceEditor())
         }
         document.addEventListener("keydown", onKeyDown)
         return () => document.removeEventListener("keydown", onKeyDown)
@@ -298,14 +273,16 @@ export function SourceEditor() {
         .replace(/\s+/g, " ")
         .trim()
         .slice(0, 84)
-    const currentGroupIndex = groups.findIndex(group =>
-        group.sids.includes(source.sid)
-    )
-    const currentGroup = groups[currentGroupIndex]
 
     const save = async (event: React.FormEvent) => {
         event.preventDefault()
-        if (!name.trim() || saving || refreshingIcon) return
+        if (
+            !name.trim() ||
+            saving ||
+            refreshingIcon ||
+            (grouping.mode === "manual" && !grouping.name?.trim())
+        )
+            return
         setSaving(true)
         try {
             const latestSource = dispatch(
@@ -318,17 +295,12 @@ export function SourceEditor() {
                     name: name.trim(),
                     category,
                     private: privateSource,
-                    autoGroup: groupIndex !== -2,
                 })
             )
             if (hidden !== source.hidden) {
                 await dispatch(toggleSourceHidden(latestSource))
             }
-            if (groupIndex >= 0 && groupName.trim()) {
-                dispatch(moveToNamedGroup(groupName.trim(), [source.sid]))
-            } else if (currentGroup?.isMultiple) {
-                dispatch(removeSourceFromGroup(currentGroupIndex, [source.sid]))
-            }
+            await dispatch(setSourceGrouping([source.sid], grouping))
             dispatch(refreshSourceSelection())
             dispatch(initFeeds(true))
             dispatch(closeSourceEditor())
@@ -408,63 +380,12 @@ export function SourceEditor() {
                             className={classes.label}>
                             {intl.get("groups.group")}
                         </label>
-                        <Combobox
-                            key={sid}
+                        <SourceGroupPicker
                             id="source-editor-group"
-                            className={classes.groupDropdown}
-                            aria-label={intl.get("groups.group")}
-                            freeform
-                            value={
-                                groupIndex === -1
-                                    ? intl.get("subscriptions.autoGroup")
-                                    : groupIndex === -2
-                                    ? intl.get("sources.ungrouped")
-                                    : groupName
-                            }
-                            selectedOptions={[
-                                groupIndex < 0
-                                    ? String(groupIndex)
-                                    : `group:${groupName}`,
-                            ]}
-                            onOptionSelect={(_, data) => {
-                                // Typing a freeform name clears the previous selection.
-                                if (data.optionValue === undefined) return
-                                if (
-                                    data.optionValue === "-1" ||
-                                    data.optionValue === "-2"
-                                ) {
-                                    setGroupIndex(Number(data.optionValue))
-                                    setGroupName("")
-                                } else {
-                                    setGroupIndex(0)
-                                    setGroupName(data.optionText || "")
-                                }
-                            }}
-                            onChange={event => {
-                                setGroupIndex(0)
-                                setGroupName(event.target.value)
-                            }}>
-                            {groupOptions.map(option => (
-                                <Option
-                                    key={option.key}
-                                    value={String(option.key)}>
-                                    {option.text}
-                                </Option>
-                            ))}
-                        </Combobox>
-                        {groupIndex >= 0 &&
-                            groupName.trim() &&
-                            !groups.some(
-                                group =>
-                                    group.isMultiple &&
-                                    group.name === groupName.trim()
-                            ) && (
-                                <small className={classes.hint}>
-                                    {intl.get("subscriptions.createOnSave", {
-                                        name: groupName.trim(),
-                                    })}
-                                </small>
-                            )}
+                            value={grouping}
+                            onChange={setGrouping}
+                            disabled={saving || refreshingIcon}
+                        />
                     </div>
                     <label className={classes.toggle}>
                         <input
@@ -528,6 +449,7 @@ export function SourceEditor() {
                                                         }
                                                         src={image}
                                                         alt=""
+                                                        draggable={false}
                                                         onError={event => {
                                                             event.currentTarget.style.display =
                                                                 "none"

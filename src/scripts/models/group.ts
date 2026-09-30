@@ -6,6 +6,7 @@ import {
     addSource,
     RSSSource,
     SourceState,
+    updateSource,
 } from "./source"
 import { SourceCategory, SourceGroup } from "../../schema-types"
 import { ActionStatus, AppThunk, domParser } from "../utils"
@@ -104,6 +105,36 @@ export function moveToNamedGroup(name: string, sids: number[]): AppThunk {
             const index = dispatch(createSourceGroup(name))
             if (!getState().groups[index].sids.includes(sid))
                 dispatch(addSourceToGroup(index, sid))
+        }
+    }
+}
+
+export type SourceGrouping = {
+    mode: "auto" | "none" | "manual"
+    name?: string
+}
+
+export function setSourceGrouping(
+    sids: number[],
+    grouping: SourceGrouping
+): AppThunk<Promise<void>> {
+    return async (dispatch, getState) => {
+        const name = grouping.name?.trim()
+        if (grouping.mode === "manual" && !name) return
+        for (const sid of new Set(sids)) {
+            const source = getState().sources[sid]
+            if (!source) continue
+            await dispatch(
+                updateSource({ ...source, autoGroup: grouping.mode !== "none" })
+            )
+            if (grouping.mode === "manual") {
+                dispatch(moveToNamedGroup(name, [sid]))
+            } else {
+                const index = getState().groups.findIndex(
+                    group => group.isMultiple && group.sids.includes(sid)
+                )
+                if (index >= 0) dispatch(removeSourceFromGroup(index, [sid]))
+            }
         }
     }
 }

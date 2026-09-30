@@ -288,6 +288,29 @@
         "layout": "卡片布局",
         "columns": "每行 {count} 个",
         "autoColumns": "自动列数",
-        "imageOnly": "仅显示图片"
+        "imageOnly": "仅显示图片",
+        "removeFromGroup": "移出分组",
+        "removedFromGroup": "已移出分组",
+        "restoreAutoGroup": "恢复自动分组"
+    },
+    "subscriptionSettings": {
+        "search": "搜索名称、网站或分组",
+        "allCategories": "全部分类",
+        "count": "{count} 个订阅源",
+        "selectedCount": "已选 {count} 个",
+        "selectVisible": "选择当前显示的订阅源",
+        "selectSource": "选择{name}",
+        "noResults": "没有符合条件的订阅源",
+        "chooseSource": "选择左侧订阅源，在这里编辑设置。",
+        "back": "返回订阅列表",
+        "batchHint": "仅将你修改的分类和分组应用到已选订阅源。",
+        "unchanged": "保持原分类",
+        "changeGroup": "修改分组",
+        "autoName": "自动使用订阅源标题",
+        "advanced": "高级设置",
+        "saved": "修改已保存",
+        "unsavedTitle": "有未保存的修改",
+        "unsavedHint": "放弃当前修改并继续？",
+        "discard": "放弃修改"
     }
 }

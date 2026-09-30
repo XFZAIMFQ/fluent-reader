@@ -17,6 +17,7 @@ import { showItem } from "../../scripts/models/page"
 import { useAppDispatch, useAppSelector } from "../../scripts/reducer"
 import Time from "../utils/time"
 import FeedToolbar from "./feed-toolbar"
+import { Star16Filled } from "@fluentui/react-icons"
 
 const useStyles = makeStyles({
     pictures: {
@@ -31,9 +32,14 @@ const useStyles = makeStyles({
             padding: "3px",
             borderRadius: "8px",
         },
-        "& .modern-entry-body": { padding: "5px 2px 0" },
-        "& .modern-entry h2": { fontSize: "12px" },
+        "& .modern-entry-body": {
+            padding: "5px 2px 0",
+            display: "flex",
+            flexDirection: "column",
+        },
+        "& .modern-entry h2": { fontSize: "12px", order: 1, marginTop: 0 },
         "& .modern-entry-meta": {
+            order: 2,
             fontSize: "11px",
             gap: "4px",
             marginTop: "3px",
@@ -53,6 +59,25 @@ const useStyles = makeStyles({
         placeItems: "center",
         height: "100%",
         color: "var(--neutralSecondary)",
+    },
+    body: { position: "relative" },
+    starredBody: { "& h2": { paddingRight: "24px" } },
+    star: {
+        position: "absolute",
+        right: "4px",
+        top: "5px",
+        display: "inline-flex",
+        color: "#fb923c",
+        pointerEvents: "none",
+    },
+    starOverlay: {
+        top: "auto",
+        bottom: "10px",
+        right: "10px",
+        padding: "4px",
+        borderRadius: "6px",
+        backgroundColor: "var(--white)",
+        boxShadow: "0 1px 6px #0003",
     },
 })
 
@@ -264,6 +289,9 @@ const ModernFeed: React.FC<{ feedId: string; view: ContentView }> = ({
                                 <button
                                     type="button"
                                     className="modern-entry-main"
+                                    onDragStart={event =>
+                                        event.preventDefault()
+                                    }
                                     onClick={() => open(item)}>
                                     {view === SourceCategory.Pictures && (
                                         <div className="modern-picture-frame">
@@ -272,6 +300,7 @@ const ModernFeed: React.FC<{ feedId: string; view: ContentView }> = ({
                                                     className="modern-entry-picture"
                                                     src={image}
                                                     alt=""
+                                                    draggable={false}
                                                 />
                                             ) : (
                                                 <span
@@ -286,7 +315,11 @@ const ModernFeed: React.FC<{ feedId: string; view: ContentView }> = ({
                                     {view === SourceCategory.Videos && (
                                         <div className="modern-entry-video">
                                             {image && (
-                                                <img src={image} alt="" />
+                                                <img
+                                                    src={image}
+                                                    alt=""
+                                                    draggable={false}
+                                                />
                                             )}
                                             <span className="modern-play">
                                                 ▶
@@ -304,7 +337,30 @@ const ModernFeed: React.FC<{ feedId: string; view: ContentView }> = ({
                                             )}
                                         </div>
                                     )}
-                                    <div className="modern-entry-body">
+                                    <div
+                                        className={mergeClasses(
+                                            "modern-entry-body",
+                                            classes.body,
+                                            item.starred && classes.starredBody
+                                        )}>
+                                        {item.starred &&
+                                            !(
+                                                view ===
+                                                    SourceCategory.Pictures &&
+                                                layout.imageOnly
+                                            ) && (
+                                                <span
+                                                    className={classes.star}
+                                                    role="img"
+                                                    aria-label={intl.get(
+                                                        "subscriptions.starred"
+                                                    )}
+                                                    title={intl.get(
+                                                        "subscriptions.starred"
+                                                    )}>
+                                                    <Star16Filled />
+                                                </span>
+                                            )}
                                         <div className="modern-entry-meta">
                                             {source.iconurl && (
                                                 <img
@@ -344,6 +400,24 @@ const ModernFeed: React.FC<{ feedId: string; view: ContentView }> = ({
                                                 />
                                             )}
                                     </div>
+                                    {item.starred &&
+                                        view === SourceCategory.Pictures &&
+                                        layout.imageOnly && (
+                                            <span
+                                                className={mergeClasses(
+                                                    classes.star,
+                                                    classes.starOverlay
+                                                )}
+                                                role="img"
+                                                aria-label={intl.get(
+                                                    "subscriptions.starred"
+                                                )}
+                                                title={intl.get(
+                                                    "subscriptions.starred"
+                                                )}>
+                                                <Star16Filled />
+                                            </span>
+                                        )}
                                 </button>
                             </article>
                         )

@@ -51,7 +51,13 @@ const Settings: React.FC = () => {
     useEffect(() => {
         if (display) setActive(selectedSids.length ? "sources" : "app")
         const onKeyDown = (event: KeyboardEvent) => {
-            if (event.key === "Escape" && !exitingRef.current) close()
+            if (
+                event.key === "Escape" &&
+                !event.defaultPrevented &&
+                !document.querySelector('[role="listbox"]') &&
+                !exitingRef.current
+            )
+                close()
         }
         if (display) {
             if (globalThis.utils.platform === "darwin")

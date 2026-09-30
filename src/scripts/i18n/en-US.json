@@ -290,6 +290,29 @@
         "layout": "Card layout",
         "columns": "{count} columns",
         "autoColumns": "Automatic columns",
-        "imageOnly": "Images only"
+        "imageOnly": "Images only",
+        "removeFromGroup": "Remove from group",
+        "removedFromGroup": "Removed from group",
+        "restoreAutoGroup": "Restore automatic grouping"
+    },
+    "subscriptionSettings": {
+        "search": "Search name, website or group",
+        "allCategories": "All categories",
+        "count": "{count} subscriptions",
+        "selectedCount": "{count} selected",
+        "selectVisible": "Select visible subscriptions",
+        "selectSource": "Select {name}",
+        "noResults": "No matching subscriptions",
+        "chooseSource": "Select a subscription to edit its settings.",
+        "back": "Back to subscriptions",
+        "batchHint": "Apply only the fields you change to the selected subscriptions.",
+        "unchanged": "Keep current category",
+        "changeGroup": "Change group",
+        "autoName": "Use the feed title automatically",
+        "advanced": "Advanced settings",
+        "saved": "Changes saved",
+        "unsavedTitle": "Unsaved changes",
+        "unsavedHint": "Discard the current edits and continue?",
+        "discard": "Discard changes"
     }
 }

@@ -265,6 +265,29 @@
         "layout": "卡片版面",
         "columns": "每行 {count} 個",
         "autoColumns": "自動欄數",
-        "imageOnly": "僅顯示圖片"
+        "imageOnly": "僅顯示圖片",
+        "removeFromGroup": "移出群組",
+        "removedFromGroup": "已移出群組",
+        "restoreAutoGroup": "恢復自動分組"
+    },
+    "subscriptionSettings": {
+        "search": "搜尋名稱、網站或群組",
+        "allCategories": "全部分類",
+        "count": "{count} 個訂閱來源",
+        "selectedCount": "已選 {count} 個",
+        "selectVisible": "選擇目前顯示的訂閱來源",
+        "selectSource": "選擇{name}",
+        "noResults": "沒有符合條件的訂閱來源",
+        "chooseSource": "選擇左側訂閱來源，在這裡編輯設定。",
+        "back": "返回訂閱列表",
+        "batchHint": "僅將你修改的分類和群組套用至已選訂閱來源。",
+        "unchanged": "保持原分類",
+        "changeGroup": "修改群組",
+        "autoName": "自動使用訂閱來源標題",
+        "advanced": "進階設定",
+        "saved": "修改已儲存",
+        "unsavedTitle": "有未儲存的修改",
+        "unsavedHint": "放棄目前修改並繼續？",
+        "discard": "放棄修改"
     }
 }

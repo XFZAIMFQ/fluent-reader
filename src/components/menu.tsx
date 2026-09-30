@@ -9,6 +9,9 @@ import {
     DocumentText24Regular,
     Image24Regular,
     Video24Regular,
+    ChevronDown16Regular,
+    ChevronRight16Regular,
+    ArrowExit20Regular,
 } from "@fluentui/react-icons"
 import { ContentView, SourceCategory } from "../schema-types"
 import { addSource, RSSSource, updateSource } from "../scripts/models/source"
@@ -23,6 +26,7 @@ import {
     toggleGroupExpansion,
     moveToNamedGroup,
     reorderSourceGroups,
+    setSourceGrouping,
 } from "../scripts/models/group"
 import { sidebarGroups } from "../scripts/sidebar-groups"
 import {
@@ -77,6 +81,29 @@ const useStyles = makeStyles({
     },
     star: { color: "#d99500" },
     row: { "cursor": "grab", ":active": { cursor: "grabbing" } },
+    groupToggle: {
+        "width": "32px",
+        "height": "32px",
+        "flexShrink": 0,
+        "display": "grid",
+        "placeItems": "center",
+        "borderRadius": "6px",
+        "& svg": { width: "18px", height: "18px" },
+        ":hover": { backgroundColor: "var(--neutralLight)" },
+        ":focus-visible": { outline: "2px solid var(--primary)" },
+    },
+    exitDrop: {
+        display: "flex",
+        alignItems: "center",
+        gap: "8px",
+        minHeight: "40px",
+        padding: "4px 12px",
+        margin: "6px 0",
+        border: "1px dashed var(--neutralTertiary)",
+        borderRadius: "8px",
+        color: "var(--neutralPrimary)",
+        fontSize: "13px",
+    },
 })
 
 export const Menu: React.FC = () => {
@@ -166,7 +193,12 @@ export const Menu: React.FC = () => {
 
     const dropHandlers = (
         key: string,
-        target: { view?: SourceCategory; name?: string; sids?: number[] }
+        target: {
+            view?: SourceCategory
+            name?: string
+            sids?: number[]
+            exit?: boolean
+        }
     ) => ({
         onDragOver: (event: React.DragEvent) => {
             if (dragSid === null || moving) return
@@ -192,6 +224,10 @@ export const Menu: React.FC = () => {
                     await dispatch(
                         updateSource({ ...original, category: target.view })
                     )
+                else if (target.exit)
+                    await dispatch(
+                        setSourceGrouping([original.sid], { mode: "none" })
+                    )
                 else
                     dispatch(
                         moveToNamedGroup(target.name, [
@@ -205,9 +241,11 @@ export const Menu: React.FC = () => {
                 dispatch(refreshSourceSelection())
                 await dispatch(initFeeds(true))
                 setNotice({
-                    text: intl.get("subscriptions.moved", {
-                        name: target.name || label(target.view),
-                    }),
+                    text: target.exit
+                        ? intl.get("subscriptions.removedFromGroup")
+                        : intl.get("subscriptions.moved", {
+                              name: target.name || label(target.view),
+                          }),
                     undo: () => {
                         setNotice(null)
                         void dispatch(async (dispatch, getState) => {
@@ -223,8 +261,17 @@ export const Menu: React.FC = () => {
                             if (
                                 !target.view &&
                                 getState().groups === expectedGroups
-                            )
+                            ) {
+                                if (target.exit && latest.autoGroup === false)
+                                    await dispatch(
+                                        updateSource({
+                                            ...latest,
+                                            autoGroup:
+                                                original.autoGroup !== false,
+                                        })
+                                    )
                                 dispatch(reorderSourceGroups(oldGroups))
+                            }
                             dispatch(refreshSourceSelection())
                             await dispatch(initFeeds(true))
                         })
@@ -407,6 +454,18 @@ export const Menu: React.FC = () => {
                         {intl.get("subscriptions.starred")}
                     </span>
                 </button>
+                {dragSid !== null && (
+                    <div
+                        data-drop-ungrouped
+                        className={mergeClasses(
+                            classes.exitDrop,
+                            dropKey === "ungrouped" && classes.drop
+                        )}
+                        {...dropHandlers("ungrouped", { exit: true })}>
+                        <ArrowExit20Regular />
+                        {intl.get("subscriptions.removeFromGroup")}
+                    </div>
+                )}
                 {folders.map(group => {
                     const expanded =
                         group.index !== undefined
@@ -425,6 +484,7 @@ export const Menu: React.FC = () => {
                                 })}>
                                 <button
                                     type="button"
+                                    className={classes.groupToggle}
                                     aria-label={
                                         expanded
                                             ? intl.get("subscriptions.collapse")
@@ -448,7 +508,11 @@ export const Menu: React.FC = () => {
                                                 return next
                                             })
                                     }}>
-                                    {expanded ? "⌄" : "›"}
+                                    {expanded ? (
+                                        <ChevronDown16Regular />
+                                    ) : (
+                                        <ChevronRight16Regular />
+                                    )}
                                 </button>
                                 <button
                                     type="button"
@@ -603,6 +667,7 @@ const SourceRow: React.FC<{
                 className="modern-source-icon"
                 src={source.iconurl}
                 alt=""
+                draggable={false}
                 onError={event => {
                     event.currentTarget.style.display = "none"
                 }}

@@ -120,6 +120,7 @@ export const FlatButton: React.FC<FlatButtonProps> = ({
 
     return (
         <button
+            type="button"
             className={mergeClasses(
                 classes.root,
                 variant === "close" && classes.close,

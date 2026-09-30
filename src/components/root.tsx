@@ -19,7 +19,6 @@ import { getFontFamilyForLocale } from "../scripts/settings"
 const useClasses = makeStyles({
     root: {
         background: "none",
-        height: "100%",
     },
 })
 
@@ -48,6 +47,7 @@ const Root: React.FC = () => {
                 style={{ height: "100%" }}>
                 <FluentProvider
                     theme={themeBundle.v9Theme}
+                    style={{ height: "100%" }}
                     className={classes.root}>
                     <CustomStyleHooksProvider value={CUSTOM_STYLE_HOOKS}>
                         <div

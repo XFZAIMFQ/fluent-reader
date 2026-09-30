@@ -36,10 +36,7 @@ import {
 } from "../schema-types"
 import { FilterType, initFeeds } from "../scripts/models/feed"
 import { deleteSource, updateSource } from "../scripts/models/source"
-import {
-    addSourceToGroup,
-    removeSourceFromGroup,
-} from "../scripts/models/group"
+import { addSourceToGroup, setSourceGrouping } from "../scripts/models/group"
 import { useAppDispatch, useAppSelector } from "../scripts/reducer"
 import {
     refreshSourceSelection,
@@ -614,19 +611,32 @@ function SourceContextMenu() {
                 items: [
                     {
                         key: "ungrouped",
-                        text: intl.get("groups.exitGroup"),
+                        text: intl.get("subscriptions.removeFromGroup"),
                         canCheck: true,
-                        checked: !currentGroup?.isMultiple,
-                        onClick: () => {
-                            if (currentGroup?.isMultiple) {
-                                dispatch(
-                                    removeSourceFromGroup(currentGroupIndex, [
-                                        sid,
-                                    ])
-                                )
-                                dispatch(refreshSourceSelection())
-                                dispatch(initFeeds(true))
-                            }
+                        checked:
+                            !currentGroup?.isMultiple &&
+                            source.autoGroup === false,
+                        onClick: async () => {
+                            await dispatch(
+                                setSourceGrouping([sid], { mode: "none" })
+                            )
+                            dispatch(refreshSourceSelection())
+                            dispatch(initFeeds(true))
+                        },
+                    },
+                    {
+                        key: "autoGroup",
+                        text: intl.get("subscriptions.restoreAutoGroup"),
+                        canCheck: true,
+                        checked:
+                            !currentGroup?.isMultiple &&
+                            source.autoGroup !== false,
+                        onClick: async () => {
+                            await dispatch(
+                                setSourceGrouping([sid], { mode: "auto" })
+                            )
+                            dispatch(refreshSourceSelection())
+                            dispatch(initFeeds(true))
                         },
                     },
                     ...groups
