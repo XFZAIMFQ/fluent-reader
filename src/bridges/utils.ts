@@ -4,6 +4,8 @@ import {
     TouchBarTexts,
     WindowStateListenerType,
     SubscribeLinkRequest,
+    LocalApiStatus,
+    SubscriptionCheckReply,
 } from "../schema-types"
 import { IObjectWithKey } from "@fluentui/react"
 
@@ -19,6 +21,28 @@ const utilsBridge = {
         return () => {
             ipcRenderer.removeListener("subscribe-link-available", listener)
         }
+    },
+
+    getLocalApiStatus: (): Promise<LocalApiStatus> => {
+        return ipcRenderer.invoke("local-api-status")
+    },
+    setLocalApiEnabled: (enabled: boolean): Promise<LocalApiStatus> => {
+        return ipcRenderer.invoke("local-api-set-enabled", enabled)
+    },
+    getLocalApiToken: (): Promise<string> => {
+        return ipcRenderer.invoke("local-api-get-token")
+    },
+    regenerateLocalApiToken: (): Promise<void> => {
+        return ipcRenderer.invoke("local-api-regenerate-token")
+    },
+    onLocalApiCheck: (callback: (urls: string[]) => SubscriptionCheckReply) => {
+        ipcRenderer.on("local-api-check", (_, id: number, urls: string[]) => {
+            try {
+                ipcRenderer.send("local-api-check-result", id, callback(urls))
+            } catch {
+                ipcRenderer.send("local-api-check-result", id, { ready: false })
+            }
+        })
     },
 
     fetchFeed: async (url: string) => {

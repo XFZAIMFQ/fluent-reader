@@ -5,10 +5,15 @@ import { initializeIcons } from "@fluentui/react/lib/Icons"
 import Root from "./components/root"
 import { initApp, openTextMenu } from "./scripts/models/app"
 import { rootStore } from "./scripts/reducer"
+import { checkSubscriptions } from "./scripts/subscription-status"
 
 window.settings.setProxy()
 
 initializeIcons("icons/")
+
+window.utils.onLocalApiCheck(urls =>
+    checkSubscriptions(urls, rootStore.getState())
+)
 
 rootStore.dispatch(initApp())
 

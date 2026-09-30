@@ -24,6 +24,7 @@ import {
 } from "@fluentui/react"
 import { RadioGroup, Radio } from "@fluentui/react-components"
 import DangerButton from "../utils/danger-button"
+import LocalApiSettings from "./local-api"
 
 type AppTabProps = {
     privacyMode: boolean
@@ -236,6 +237,8 @@ class AppTab extends React.Component<AppTabProps, AppTabState> {
                     }
                 />
             </div>
+
+            <LocalApiSettings />
 
             <h2 className="modern-settings-section-title">
                 {intl.get("app.otherSection")}

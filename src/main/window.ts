@@ -4,6 +4,7 @@ import * as path from "node:path"
 import { setThemeListener } from "./settings"
 import { setUtilsListeners } from "./utils"
 import { captureSubscribeLink } from "./subscribe-link"
+import { initializeLocalApi } from "./local-api"
 
 export class WindowManager {
     mainWindow: BrowserWindow = null
@@ -26,6 +27,7 @@ export class WindowManager {
             })
             this.setListeners()
             this.createWindow()
+            initializeLocalApi(this)
         })
     }
 

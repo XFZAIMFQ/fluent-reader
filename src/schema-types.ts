@@ -40,6 +40,25 @@ export interface SubscribeLinkRequest {
     view: SourceCategory
 }
 
+export const LOCAL_API_PORT = 39124
+
+export interface LocalApiStatus {
+    enabled: boolean
+    running: boolean
+    port: number
+    error: string | null
+}
+
+export interface SubscriptionCheckResult {
+    subscribed: boolean
+    view?: SourceCategory
+}
+
+export interface SubscriptionCheckReply {
+    ready: boolean
+    results?: SubscriptionCheckResult[]
+}
+
 export const enum ViewConfigs {
     ShowCover = 1 << 0,
     ShowSnippet = 1 << 1,
