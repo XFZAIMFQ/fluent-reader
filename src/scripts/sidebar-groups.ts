@@ -36,7 +36,11 @@ export function mergeNamedGroups(groups: SourceGroup[]): SourceGroup[] {
     return changed ? merged : groups
 }
 
-export function sidebarGroups(groups: SourceGroup[], visible: RSSSource[]) {
+export function sidebarGroups(
+    groups: SourceGroup[],
+    visible: RSSSource[],
+    options: { settings?: boolean; order?: string[] } = {}
+) {
     const ids = new Set(visible.map(source => source.sid))
     const sourceById = new Map(visible.map(source => [source.sid, source]))
     const orderedIds = new Set([
@@ -85,7 +89,7 @@ export function sidebarGroups(groups: SourceGroup[], visible: RSSSource[]) {
         if (existing) {
             sids.forEach(sid => assigned.add(sid))
             existing.sids = [...new Set([...existing.sids, ...sids])]
-        } else if (sids.length >= 2) {
+        } else if (sids.length >= (options.settings ? 1 : 2)) {
             sids.forEach(sid => assigned.add(sid))
             folders.push({
                 key: `auto-${encodeURIComponent(domain)}`,
@@ -97,5 +101,34 @@ export function sidebarGroups(groups: SourceGroup[], visible: RSSSource[]) {
         }
     })
     const singles = [...orderedIds].filter(sid => !assigned.has(sid))
-    return { folders: folders.filter(folder => folder.sids.length), singles }
+    const order = new Map(
+        (options.order || []).map((key, index) => [key, index])
+    )
+    return {
+        folders: folders
+            .filter(folder => options.settings || folder.sids.length)
+            .sort(
+                (a, b) =>
+                    (order.get(a.key) ?? Infinity) -
+                    (order.get(b.key) ?? Infinity)
+            ),
+        singles,
+    }
+}
+
+export function subscriptionGroups(
+    groups: SourceGroup[],
+    sources: RSSSource[],
+    order: string[] = []
+): SidebarGroup[] {
+    const { folders, singles } = sidebarGroups(groups, sources, {
+        settings: true,
+        order,
+    })
+    return singles.length
+        ? [
+              ...folders,
+              { key: "ungrouped", name: "", sids: singles, expanded: true },
+          ]
+        : folders
 }

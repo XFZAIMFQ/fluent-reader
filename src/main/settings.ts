@@ -28,6 +28,13 @@ ipcMain.on("get-reader-preferences", event => {
 ipcMain.handle("set-reader-preferences", (_, value: ReaderPreferences) => {
     store.set("readerPreferences", {
         ...value,
+        groupOrder: Array.isArray(value.groupOrder)
+            ? [
+                  ...new Set(
+                      value.groupOrder.filter(key => typeof key === "string")
+                  ),
+              ]
+            : [],
         startupFetch: Boolean(value.startupFetch),
         readingMode: value.readingMode === "inline" ? "inline" : "overlay",
         readBehavior: value.readBehavior === "manual" ? "manual" : "auto",

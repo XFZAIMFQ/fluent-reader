@@ -11,7 +11,7 @@ import {
 import { SourceCategory, SourceGroup } from "../../schema-types"
 import { ActionStatus, AppThunk, domParser } from "../utils"
 import { saveSettings } from "./app"
-import { mergeNamedGroups } from "../sidebar-groups"
+import { mergeNamedGroups, subscriptionGroups } from "../sidebar-groups"
 import {
     fetchItemsIntermediate,
     fetchItemsRequest,
@@ -231,10 +231,60 @@ function reorderSourceGroupsDone(
     }
 }
 
-export function reorderSourceGroups(groups: SourceGroup[]): AppThunk {
-    return (dispatch, getState) => {
+export function reorderSourceGroups(
+    groups: SourceGroup[]
+): AppThunk<Promise<void>> {
+    return async (dispatch, getState) => {
         dispatch(reorderSourceGroupsDone(groups))
-        window.settings.saveGroups(getState().groups)
+        await window.settings.saveGroups(getState().groups)
+    }
+}
+
+export function reorderSubscriptionSources(
+    key: string,
+    sids: number[]
+): AppThunk<Promise<void>> {
+    return async (dispatch, getState) => {
+        const state = getState()
+        const folder = subscriptionGroups(
+            state.groups,
+            Object.values(state.sources)
+        ).find(folder => folder.key === key)
+        if (
+            !folder ||
+            folder.sids.length !== sids.length ||
+            new Set(sids).size !== sids.length ||
+            sids.some(sid => !folder.sids.includes(sid))
+        )
+            throw new Error(intl.get("groupSettings.listChanged"))
+        const ids = new Set(sids)
+        let groups: SourceGroup[]
+        if (folder.index !== undefined) {
+            groups = state.groups
+                .map((group, index) => ({
+                    ...group,
+                    sids:
+                        index === folder.index
+                            ? sids
+                            : group.sids.filter(sid => !ids.has(sid)),
+                }))
+                .filter(group => group.isMultiple || group.sids.length)
+        } else {
+            const singles = new Map(
+                state.groups
+                    .filter(group => !group.isMultiple)
+                    .map(group => [group.sids[0], group])
+            )
+            let position = 0
+            groups = state.groups.map(group =>
+                !group.isMultiple && ids.has(group.sids[0])
+                    ? singles.get(sids[position++])
+                    : group
+            )
+            if (position !== sids.length)
+                throw new Error(intl.get("groupSettings.listChanged"))
+        }
+        await dispatch(reorderSourceGroups(groups))
     }
 }
 

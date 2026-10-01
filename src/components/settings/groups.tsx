@@ -1,535 +1,1067 @@
-import { SettingsDropdown as Dropdown } from "../utils/settings-dropdown"
 import * as React from "react"
+import { useEffect, useLayoutEffect, useMemo, useState } from "react"
 import intl from "react-intl-universal"
-import { SourceGroup } from "../../schema-types"
-import { SourceState, RSSSource } from "../../scripts/models/source"
+import { mergeClasses } from "@griffel/react"
+import { MessageBar, MessageBarType } from "@fluentui/react"
 import {
-    IColumn,
-    Selection,
-    SelectionMode,
-    DetailsList,
-    Label,
-    Stack,
-    TextField,
-    PrimaryButton,
-    DefaultButton,
-    IDropdownOption,
-    CommandBarButton,
-    MarqueeSelection,
-    IDragDropEvents,
-    MessageBar,
-    MessageBarType,
-    MessageBarButton,
-} from "@fluentui/react"
-import DangerButton from "../utils/danger-button"
+    Add20Regular,
+    Search20Regular,
+    Globe20Regular,
+    Folder20Regular,
+    ReOrderDotsVertical20Regular,
+    ArrowSort20Regular,
+    ArrowLeft20Regular,
+} from "@fluentui/react-icons"
+import { SubscriptionPolicy, SyncService } from "../../schema-types"
+import {
+    useAppDispatch,
+    useAppSelector,
+    useAppStore,
+} from "../../scripts/reducer"
+import { SidebarGroup, subscriptionGroups } from "../../scripts/sidebar-groups"
+import {
+    createSourceGroup,
+    updateSourceGroup,
+    deleteSourceGroup,
+    setSourceGrouping,
+    reorderSubscriptionSources,
+} from "../../scripts/models/group"
+import {
+    setReaderPreferences,
+    refreshSourceSelection,
+    selectSources,
+} from "../../scripts/models/page"
+import { initFeeds, SOURCE } from "../../scripts/models/feed"
+import { importGroups } from "../../scripts/models/service"
+import { openSourceEditor } from "../../scripts/models/app"
+import { RSSSource } from "../../scripts/models/source"
+import { sourceFrequencyOverride } from "../../scripts/subscription-policy"
+import { FlatButton } from "../utils/FlatButton"
+import { SettingsDropdown } from "../utils/settings-dropdown"
+import { frequencyText } from "../utils/subscription-policy-fields"
+import { useListReorder } from "../utils/use-list-reorder"
 import GroupPolicySettings from "./group-policy"
-import { SettingsSection } from "../utils/settings-section"
+import { useStyles } from "./source-settings.styles"
+import { useGroupStyles } from "./group-settings.styles"
 
-type GroupsTabProps = {
-    sources: SourceState
-    groups: SourceGroup[]
-    serviceOn: boolean
-    createGroup: (name: string) => void
-    updateGroup: (group: SourceGroup) => void
-    addToGroup: (groupIndex: number, sid: number) => void
-    deleteGroup: (groupIndex: number) => void
-    removeFromGroup: (groupIndex: number, sids: number[]) => void
-    reorderGroups: (groups: SourceGroup[]) => void
-    importGroups: () => Promise<void>
+const emptyPolicy: SubscriptionPolicy = {}
+const folderKey = (name: string) => `folder-${encodeURIComponent(name)}`
+function moved<T>(items: T[], from: T, to: T): T[] {
+    const next = [...items],
+        index = next.indexOf(to)
+    if (index < 0 || !next.includes(from)) return next
+    next.splice(next.indexOf(from), 1)
+    next.splice(index, 0, from)
+    return next
 }
 
-type GroupsTabState = {
-    [formName: string]: any
-    selectedGroup: SourceGroup
-    selectedSources: RSSSource[]
-    dropdownIndex: number
-    manageGroup: boolean
-}
+export default function GroupsTab() {
+    const dispatch = useAppDispatch(),
+        store = useAppStore()
+    const classes = useStyles(),
+        styles = useGroupStyles()
+    const sources = useAppSelector(state => state.sources)
+    const groups = useAppSelector(state => state.groups)
+    const preferences = useAppSelector(state => state.page.readerPreferences)
+    const serviceOn = useAppSelector(
+        state => state.service.type !== SyncService.None
+    )
+    const folders = useMemo(
+        () =>
+            subscriptionGroups(
+                groups,
+                Object.values(sources),
+                preferences.groupOrder
+            ),
+        [groups, sources, preferences.groupOrder]
+    )
+    const [selectedKey, setSelectedKey] = useState(folders[0]?.key || null)
+    const [query, setQuery] = useState("")
+    const [filter, setFilter] = useState("all")
+    const [tab, setTab] = useState<"rules" | "sources">("rules")
+    const [draft, setDraft] = useState<SubscriptionPolicy>({})
+    const [name, setName] = useState("")
+    const [dirty, setDirty] = useState(false)
+    const [busy, setBusy] = useState(false)
+    const [error, setError] = useState("")
+    const [notice, setNotice] = useState("")
+    const [creating, setCreating] = useState(false)
+    const [newName, setNewName] = useState("")
+    const [sourceQuery, setSourceQuery] = useState("")
+    const [checked, setChecked] = useState<number[]>([])
+    const [addingSources, setAddingSources] = useState(false)
+    const folder = folders.find(folder => folder.key === selectedKey)
+    const ungrouped = folder?.key === "ungrouped"
+    const policyFor = (folder: SidebarGroup) =>
+        folder.index === undefined
+            ? preferences.domainPolicies[folder.domain] || emptyPolicy
+            : groups[folder.index]?.policy || emptyPolicy
+    const savedPolicy = folder && !ungrouped ? policyFor(folder) : emptyPolicy
+    const savedName = folder?.name || ""
+    const kind = (folder: SidebarGroup) =>
+        folder.key === "ungrouped"
+            ? "ungrouped"
+            : folder.index === undefined
+            ? "auto"
+            : "manual"
+    const label = (folder: SidebarGroup) =>
+        folder.key === "ungrouped"
+            ? intl.get("groupSettings.ungrouped")
+            : folder.name
+    const kindText = (folder: SidebarGroup) =>
+        intl.get(`groupSettings.${kind(folder)}`)
 
-class GroupsTab extends React.Component<GroupsTabProps, GroupsTabState> {
-    groupSelection: Selection
-    groupDragDropEvents: IDragDropEvents
-    groupDraggedItem: SourceGroup
-    groupDraggedIndex = -1
-    sourcesSelection: Selection
-    sourcesDragDropEvents: IDragDropEvents
-    sourcesDraggedItem: RSSSource
-    sourcesDraggedIndex = -1
-
-    constructor(props) {
-        super(props)
-        this.state = {
-            editGroupName: "",
-            newGroupName: "",
-            selectedGroup: null,
-            selectedSources: null,
-            dropdownIndex: null,
-            manageGroup: false,
+    useLayoutEffect(() => {
+        if (!dirty) {
+            setDraft({ ...savedPolicy })
+            setName(savedName)
         }
-        this.groupDragDropEvents = this.getGroupDragDropEvents()
-        this.sourcesDragDropEvents = this.getSourcesDragDropEvents()
-        this.groupSelection = new Selection({
-            getKey: g => (g as SourceGroup).index,
-            onSelectionChanged: () => {
-                let g = this.groupSelection.getSelectedCount()
-                    ? (this.groupSelection.getSelection()[0] as SourceGroup)
-                    : null
-                this.setState({
-                    selectedGroup: g,
-                    editGroupName: g && g.isMultiple ? g.name : "",
-                })
-            },
-        })
-        this.sourcesSelection = new Selection({
-            getKey: s => (s as RSSSource).sid,
-            onSelectionChanged: () => {
-                let sources = this.sourcesSelection.getSelectedCount()
-                    ? (this.sourcesSelection.getSelection() as RSSSource[])
-                    : null
-                this.setState({
-                    selectedSources: sources,
-                })
-            },
-        })
-    }
-
-    groupColumns = (): IColumn[] => [
-        {
-            key: "type",
-            name: intl.get("groups.type"),
-            minWidth: 40,
-            maxWidth: 40,
-            data: "string",
-            onRender: (g: SourceGroup) => (
-                <>
-                    {g.isMultiple
-                        ? intl.get("groups.group")
-                        : intl.get("groups.source")}
-                </>
-            ),
-        },
-        {
-            key: "capacity",
-            name: intl.get("groups.capacity"),
-            minWidth: 40,
-            maxWidth: 60,
-            data: "string",
-            onRender: (g: SourceGroup) => (
-                <>{g.isMultiple ? g.sids.length : ""}</>
-            ),
-        },
-        {
-            key: "name",
-            name: intl.get("name"),
-            minWidth: 200,
-            data: "string",
-            isRowHeader: true,
-            onRender: (g: SourceGroup) => (
-                <>
-                    {g.isMultiple ? g.name : this.props.sources[g.sids[0]].name}
-                </>
-            ),
-        },
-    ]
-
-    sourceColumns: IColumn[] = [
-        {
-            key: "favicon",
-            name: intl.get("icon"),
-            fieldName: "name",
-            isIconOnly: true,
-            iconName: "ImagePixel",
-            minWidth: 16,
-            maxWidth: 16,
-            onRender: (s: RSSSource) =>
-                s.iconurl && <img src={s.iconurl} className="favicon" />,
-        },
-        {
-            key: "name",
-            name: intl.get("name"),
-            fieldName: "name",
-            minWidth: 200,
-            data: "string",
-            isRowHeader: true,
-        },
-        {
-            key: "url",
-            name: "URL",
-            fieldName: "url",
-            minWidth: 280,
-            data: "string",
-        },
-    ]
-
-    getGroupDragDropEvents = (): IDragDropEvents => ({
-        canDrop: () => true,
-        canDrag: () => true,
-        onDrop: (item?: SourceGroup) => {
-            if (this.groupDraggedItem) {
-                this.reorderGroups(item)
-            }
-        },
-        onDragStart: (item?: SourceGroup, itemIndex?: number) => {
-            this.groupDraggedItem = item
-            this.groupDraggedIndex = itemIndex!
-        },
-        onDragEnd: () => {
-            this.groupDraggedItem = undefined
-            this.groupDraggedIndex = -1
-        },
-    })
-
-    reorderGroups = (item: SourceGroup) => {
-        let draggedItem = this.groupSelection.isIndexSelected(
-            this.groupDraggedIndex
+    }, [selectedKey, savedPolicy, savedName, dirty])
+    useEffect(() => {
+        if (!busy && selectedKey && !folder) {
+            setSelectedKey(folders[0]?.key || null)
+            setDirty(false)
+        }
+    }, [folders, selectedKey, folder, busy])
+    useEffect(() => {
+        setChecked([])
+        setSourceQuery("")
+        setAddingSources(false)
+        if (selectedKey === "ungrouped") setTab("sources")
+    }, [selectedKey])
+    useEffect(() => {
+        setChecked(ids =>
+            ids.filter(
+                id =>
+                    sources[id] &&
+                    (addingSources
+                        ? !folder?.sids.includes(id)
+                        : folder?.sids.includes(id))
+            )
         )
-            ? (this.groupSelection.getSelection()[0] as SourceGroup)
-            : this.groupDraggedItem!
+    }, [sources, folder, addingSources])
 
-        let insertIndex = item.index
-        let groups = this.props.groups.filter(g => g.index != draggedItem.index)
-
-        groups.splice(insertIndex, 0, draggedItem)
-        this.groupSelection.setAllSelected(false)
-        this.props.reorderGroups(groups)
+    const canLeave = async () =>
+        !busy &&
+        (!dirty ||
+            (await globalThis.utils.showMessageBox(
+                intl.get("subscriptionSettings.unsavedTitle"),
+                intl.get("subscriptionSettings.unsavedHint"),
+                intl.get("subscriptionSettings.discard"),
+                intl.get("cancel"),
+                true,
+                "warning"
+            )))
+    const selectFolder = async (key: string) => {
+        if (key === selectedKey || !(await canLeave())) return
+        setSelectedKey(key)
+        setDirty(false)
+        setError("")
+        setNotice("")
     }
-
-    getSourcesDragDropEvents = (): IDragDropEvents => ({
-        canDrop: () => true,
-        canDrag: () => true,
-        onDrop: (item?: RSSSource) => {
-            if (this.sourcesDraggedItem) {
-                this.reorderSources(item)
+    const run = async (work: () => Promise<void>, refresh = false) => {
+        if (busy) return
+        setBusy(true)
+        setError("")
+        setNotice("")
+        try {
+            await work()
+            if (refresh) {
+                dispatch(refreshSourceSelection())
+                await dispatch(initFeeds(true))
             }
-        },
-        onDragStart: (item?: RSSSource, itemIndex?: number) => {
-            this.sourcesDraggedItem = item
-            this.sourcesDraggedIndex = itemIndex!
-        },
-        onDragEnd: () => {
-            this.sourcesDraggedItem = undefined
-            this.sourcesDraggedIndex = -1
-        },
-    })
-
-    reorderSources = (item: RSSSource) => {
-        let draggedItems = this.sourcesSelection.isIndexSelected(
-            this.sourcesDraggedIndex
-        )
-            ? (this.sourcesSelection.getSelection() as RSSSource[]).map(
-                  s => s.sid
+            setNotice(intl.get("subscriptionSettings.saved"))
+        } catch (error) {
+            setError(String(error))
+        } finally {
+            setBusy(false)
+        }
+    }
+    const reset = () => {
+        setDraft({ ...savedPolicy })
+        setName(savedName)
+        setDirty(false)
+        setError("")
+        setNotice("")
+    }
+    const nameError = (value: string, exclude?: string) =>
+        !value.trim()
+            ? intl.get("emptyName")
+            : folders.some(
+                  folder =>
+                      folder.key !== exclude &&
+                      label(folder).toLocaleLowerCase() ===
+                          value.trim().toLocaleLowerCase()
               )
-            : [this.sourcesDraggedItem!.sid]
-
-        let insertIndex = this.state.selectedGroup.sids.indexOf(item.sid)
-        let items = this.state.selectedGroup.sids.filter(
-            sid => !draggedItems.includes(sid)
-        )
-
-        items.splice(insertIndex, 0, ...draggedItems)
-
-        let group = { ...this.state.selectedGroup, sids: items }
-        this.props.updateGroup(group)
-        this.setState({ selectedGroup: group })
+            ? intl.get("groups.exist")
+            : ""
+    const changePolicy = (value: SubscriptionPolicy) => {
+        setDraft(value)
+        setDirty(true)
+        setNotice("")
     }
-
-    manageGroup = (g: SourceGroup) => {
-        if (g.isMultiple) {
-            this.setState({
-                selectedGroup: g,
-                editGroupName: g && g.isMultiple ? g.name : "",
-                manageGroup: true,
-            })
+    const persistOrder = async (order: string[]) => {
+        await dispatch(setReaderPreferences({ groupOrder: order }))
+    }
+    const save = async () => {
+        if (!folder || ungrouped) return
+        const nextName = name.trim(),
+            invalid =
+                folder.index === undefined
+                    ? ""
+                    : nameError(nextName, folder.key)
+        if (invalid) {
+            setError(invalid)
+            return
         }
-    }
-
-    dropdownOptions = () =>
-        this.props.groups
-            .filter(g => g.isMultiple)
-            .map(g => ({
-                key: g.index,
-                text: g.name,
-            }))
-
-    handleInputChange = event => {
-        const name: string = event.target.name
-        this.setState({ [name]: event.target.value })
-    }
-
-    validateNewGroupName = (v: string) => {
-        return this.validateGroupName(v)
-    }
-
-    validateGroupName = (v: string, excludeIndex?: number) => {
-        const name = v.trim()
-        if (name.length == 0) {
-            return intl.get("emptyName")
-        }
-        for (let group of this.props.groups) {
-            if (
-                group.index !== excludeIndex &&
-                group.isMultiple &&
-                group.name.trim() === name
-            ) {
-                return intl.get("groups.exist")
-            }
-        }
-        return ""
-    }
-
-    validateEditedGroupName = (v: string) =>
-        this.validateGroupName(v, this.state.selectedGroup?.index)
-
-    createGroup = (event: React.FormEvent) => {
-        event.preventDefault()
-        let trimmed = this.state.newGroupName.trim()
-        if (this.validateNewGroupName(trimmed) === "")
-            this.props.createGroup(trimmed)
-    }
-
-    addToGroup = () => {
-        this.props.addToGroup(
-            this.state.dropdownIndex,
-            this.state.selectedGroup.sids[0]
-        )
-    }
-
-    removeFromGroup = () => {
-        this.props.removeFromGroup(
-            this.state.selectedGroup.index,
-            this.state.selectedSources.map(s => s.sid)
-        )
-        this.setState({ selectedSources: null })
-    }
-
-    deleteGroup = () => {
-        this.props.deleteGroup(this.state.selectedGroup.index)
-        this.groupSelection.setIndexSelected(
-            this.state.selectedGroup.index,
-            false,
-            false
-        )
-        this.setState({ selectedGroup: null })
-    }
-
-    updateGroupName = () => {
-        if (this.validateEditedGroupName(this.state.editGroupName)) return
-        let group = this.state.selectedGroup
-        group = { ...group, name: this.state.editGroupName.trim() }
-        this.props.updateGroup(group)
-    }
-
-    dropdownChange = (_, item: IDropdownOption) => {
-        this.setState({ dropdownIndex: item ? Number(item.key) : null })
-    }
-
-    render = () => (
-        <div className="tab-body">
-            <SettingsSection title={intl.get("groups.management")}>
-                {this.state.manageGroup && this.state.selectedGroup && (
-                    <>
-                        <Stack
-                            horizontal
-                            horizontalAlign="space-between"
-                            style={{ height: 40 }}>
-                            <CommandBarButton
-                                text={intl.get("groups.exitGroup")}
-                                iconProps={{ iconName: "BackToWindow" }}
-                                onClick={() =>
-                                    this.setState({ manageGroup: false })
-                                }
-                            />
-                            {this.state.selectedSources != null && (
-                                <CommandBarButton
-                                    text={intl.get("groups.deleteSource")}
-                                    onClick={this.removeFromGroup}
-                                    iconProps={{
-                                        iconName: "RemoveFromShoppingList",
-                                        style: { color: "#d13438" },
-                                    }}
-                                />
-                            )}
-                        </Stack>
-
-                        <MarqueeSelection
-                            selection={this.sourcesSelection}
-                            isDraggingConstrainedToRoot={true}>
-                            <DetailsList
-                                compact={true}
-                                items={this.state.selectedGroup.sids.map(
-                                    sid => this.props.sources[sid]
-                                )}
-                                columns={this.sourceColumns}
-                                dragDropEvents={this.sourcesDragDropEvents}
-                                setKey="multiple"
-                                selection={this.sourcesSelection}
-                                selectionMode={SelectionMode.multiple}
-                            />
-                        </MarqueeSelection>
-
-                        <span className="settings-hint">
-                            {intl.get("groups.sourceHint")}
-                        </span>
-                    </>
-                )}
-                {!this.state.manageGroup || !this.state.selectedGroup ? (
-                    <>
-                        {this.props.serviceOn && (
-                            <MessageBar
-                                messageBarType={MessageBarType.info}
-                                isMultiline={false}
-                                actions={
-                                    <MessageBarButton
-                                        text={intl.get("service.importGroups")}
-                                        onClick={this.props.importGroups}
-                                    />
-                                }>
-                                {intl.get("service.groupsWarning")}
-                            </MessageBar>
-                        )}
-                        <form
-                            className="modern-setting-row"
-                            onSubmit={this.createGroup}>
-                            <div className="modern-setting-copy">
-                                <label htmlFor="newGroupName">
-                                    <strong>{intl.get("groups.create")}</strong>
-                                </label>
-                            </div>
-                            <Stack horizontal>
-                                <Stack.Item grow>
-                                    <TextField
-                                        onGetErrorMessage={
-                                            this.validateNewGroupName
-                                        }
-                                        validateOnLoad={false}
-                                        placeholder={intl.get(
-                                            "groups.enterName"
-                                        )}
-                                        value={this.state.newGroupName}
-                                        id="newGroupName"
-                                        name="newGroupName"
-                                        onChange={this.handleInputChange}
-                                    />
-                                </Stack.Item>
-                                <Stack.Item>
-                                    <PrimaryButton
-                                        disabled={
-                                            this.validateNewGroupName(
-                                                this.state.newGroupName
-                                            ) !== ""
-                                        }
-                                        type="submit"
-                                        text={intl.get("create")}
-                                    />
-                                </Stack.Item>
-                            </Stack>
-                        </form>
-
-                        <DetailsList
-                            compact={true}
-                            items={this.props.groups}
-                            columns={this.groupColumns()}
-                            setKey="selected"
-                            onItemInvoked={this.manageGroup}
-                            dragDropEvents={this.groupDragDropEvents}
-                            selection={this.groupSelection}
-                            selectionMode={SelectionMode.single}
-                        />
-
-                        {this.state.selectedGroup ? (
-                            this.state.selectedGroup.isMultiple ? (
-                                <>
-                                    <Label>
-                                        {intl.get("groups.selectedGroup")}
-                                    </Label>
-                                    <Stack horizontal>
-                                        <Stack.Item grow>
-                                            <TextField
-                                                onGetErrorMessage={
-                                                    this.validateEditedGroupName
-                                                }
-                                                validateOnLoad={false}
-                                                placeholder={intl.get(
-                                                    "groups.enterName"
-                                                )}
-                                                value={this.state.editGroupName}
-                                                name="editGroupName"
-                                                onChange={
-                                                    this.handleInputChange
-                                                }
-                                            />
-                                        </Stack.Item>
-                                        <Stack.Item>
-                                            <DefaultButton
-                                                disabled={
-                                                    this.validateEditedGroupName(
-                                                        this.state.editGroupName
-                                                    ) !== ""
-                                                }
-                                                onClick={this.updateGroupName}
-                                                text={intl.get(
-                                                    "groups.editName"
-                                                )}
-                                            />
-                                        </Stack.Item>
-                                        <Stack.Item>
-                                            <DangerButton
-                                                key={
-                                                    this.state.selectedGroup
-                                                        .index
-                                                }
-                                                onClick={this.deleteGroup}
-                                                text={intl.get(
-                                                    "groups.deleteGroup"
-                                                )}
-                                            />
-                                        </Stack.Item>
-                                    </Stack>
-                                </>
-                            ) : (
-                                <>
-                                    <Label>
-                                        {intl.get("groups.selectedSource")}
-                                    </Label>
-                                    <Stack horizontal>
-                                        <Stack.Item grow>
-                                            <Dropdown
-                                                placeholder={intl.get(
-                                                    "groups.chooseGroup"
-                                                )}
-                                                selectedKey={
-                                                    this.state.dropdownIndex
-                                                }
-                                                options={this.dropdownOptions()}
-                                                onChange={this.dropdownChange}
-                                            />
-                                        </Stack.Item>
-                                        <Stack.Item>
-                                            <DefaultButton
-                                                disabled={
-                                                    this.state.dropdownIndex ===
-                                                    null
-                                                }
-                                                onClick={this.addToGroup}
-                                                text={intl.get(
-                                                    "groups.addToGroup"
-                                                )}
-                                            />
-                                        </Stack.Item>
-                                    </Stack>
-                                </>
+        await run(async () => {
+            if (folder.index === undefined)
+                await dispatch(
+                    setReaderPreferences({
+                        domainPolicies: { [folder.domain]: draft },
+                    })
+                )
+            else {
+                let index = folder.index
+                let latest = store.getState().groups[index]
+                if (!latest || latest.name !== folder.name)
+                    throw new Error(intl.get("groupSettings.listChanged"))
+                // A named website group can also contain automatic members.
+                // Keep them in the renamed folder rather than recreating it.
+                if (
+                    nextName !== folder.name &&
+                    folder.sids.length !== latest.sids.length
+                ) {
+                    await dispatch(
+                        reorderSubscriptionSources(folder.key, folder.sids)
+                    )
+                    index = store
+                        .getState()
+                        .groups.findIndex(
+                            group =>
+                                group.isMultiple && group.name === folder.name
+                        )
+                    latest = store.getState().groups[index]
+                }
+                await dispatch(
+                    updateSourceGroup({
+                        ...latest,
+                        index,
+                        name: nextName,
+                        policy: draft,
+                    })
+                )
+                if (nextName !== folder.name) {
+                    const order = (
+                        store.getState().page.readerPreferences.groupOrder || []
+                    ).map(key =>
+                        key === folder.key ? folderKey(nextName) : key
+                    )
+                    await persistOrder(order)
+                    setSelectedKey(folderKey(nextName))
+                    const state = store.getState()
+                    if (state.app.menuKey === folder.key) {
+                        dispatch(
+                            selectSources(
+                                state.feeds[SOURCE].sids,
+                                folderKey(nextName),
+                                nextName,
+                                true
                             )
-                        ) : (
-                            <span className="settings-hint">
-                                {intl.get("groups.groupHint")}
-                            </span>
+                        )
+                        await dispatch(initFeeds(true))
+                    }
+                }
+            }
+            setDirty(false)
+        })
+    }
+    const create = async (event: React.FormEvent) => {
+        event.preventDefault()
+        const invalid = nameError(newName)
+        if (invalid) {
+            setError(invalid)
+            return
+        }
+        if (!(await canLeave())) return
+        await run(async () => {
+            dispatch(createSourceGroup(newName.trim()))
+            await window.settings.saveGroups(store.getState().groups)
+            setSelectedKey(folderKey(newName.trim()))
+            setDirty(false)
+            setTab("rules")
+            setCreating(false)
+            setNewName("")
+            setQuery("")
+            setFilter("all")
+        })
+    }
+    const remove = async (ids: number[]) => {
+        await run(async () => {
+            await dispatch(setSourceGrouping(ids, { mode: "none" }))
+            await window.settings.saveGroups(store.getState().groups)
+            setChecked([])
+        }, true)
+    }
+    const deleteFolder = async () => {
+        if (!folder || folder.index === undefined || !(await canLeave())) return
+        if (
+            !(await globalThis.utils.showMessageBox(
+                intl.get("groups.deleteGroup"),
+                intl.get("groupSettings.deleteHint"),
+                intl.get("delete"),
+                intl.get("cancel"),
+                true,
+                "warning"
+            ))
+        )
+            return
+        await run(async () => {
+            await dispatch(setSourceGrouping(folder.sids, { mode: "none" }))
+            const index = store
+                .getState()
+                .groups.findIndex(
+                    group => group.isMultiple && group.name === folder.name
+                )
+            if (index >= 0) dispatch(deleteSourceGroup(index))
+            await window.settings.saveGroups(store.getState().groups)
+            await persistOrder(
+                (
+                    store.getState().page.readerPreferences.groupOrder || []
+                ).filter(key => key !== folder.key)
+            )
+            setSelectedKey(null)
+            setDirty(false)
+        }, true)
+    }
+    const addMembers = async () => {
+        if (!folder || folder.index === undefined || !checked.length) return
+        await run(async () => {
+            await dispatch(
+                setSourceGrouping(checked, {
+                    mode: "manual",
+                    name: folder.name,
+                })
+            )
+            await window.settings.saveGroups(store.getState().groups)
+            setChecked([])
+            setAddingSources(false)
+        }, true)
+    }
+    const textFor = (source: RSSSource) =>
+        [source.name, source.url, source.siteUrl].join(" ").toLocaleLowerCase()
+    const visible = folders.filter(
+        folder =>
+            (filter === "all" || kind(folder) === filter) &&
+            [label(folder), ...folder.sids.map(sid => textFor(sources[sid]))]
+                .join(" ")
+                .toLocaleLowerCase()
+                .includes(query.trim().toLocaleLowerCase())
+    )
+    const orderable = folders
+        .filter(folder => folder.key !== "ungrouped")
+        .map(folder => folder.key)
+    const groupDrag = useListReorder(
+        visible
+            .filter(folder => folder.key !== "ungrouped")
+            .map(folder => folder.key),
+        (from, to) =>
+            void run(async () => {
+                await persistOrder(moved(orderable, from, to))
+            }),
+        busy
+    )
+    const groupSourceIds = folder?.sids || []
+    const memberIds = addingSources
+        ? Object.values(sources)
+              .filter(source => !groupSourceIds.includes(source.sid))
+              .map(source => source.sid)
+        : groupSourceIds
+    const members = memberIds
+        .map(id => sources[id])
+        .filter(
+            source =>
+                source &&
+                textFor(source).includes(sourceQuery.trim().toLocaleLowerCase())
+        )
+    const sourceDrag = useListReorder(
+        members.map(source => String(source.sid)),
+        (from, to) =>
+            void run(async () => {
+                await dispatch(
+                    reorderSubscriptionSources(
+                        folder.key,
+                        moved(groupSourceIds, Number(from), Number(to))
+                    )
+                )
+            }),
+        busy || addingSources
+    )
+    const sourceFrequency = (source: RSSSource) =>
+        sourceFrequencyOverride(source)
+    const sortByName = () =>
+        void run(async () => {
+            await persistOrder(
+                [...folders]
+                    .filter(folder => folder.key !== "ungrouped")
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map(folder => folder.key)
+            )
+        })
+    const openEditor = async (source: RSSSource) => {
+        if (await canLeave()) {
+            reset()
+            dispatch(openSourceEditor(source.sid))
+        }
+    }
+    const importServiceGroups = async () => {
+        if (!(await canLeave())) return
+        setDirty(false)
+        await run(async () => {
+            await dispatch(importGroups())
+        }, true)
+    }
+
+    return (
+        <div className={classes.root} data-group-settings>
+            {serviceOn && (
+                <MessageBar messageBarType={MessageBarType.info}>
+                    {intl.get("service.groupsWarning")}{" "}
+                    <FlatButton
+                        styleClass={classes.button}
+                        disabled={busy}
+                        onClick={() => void importServiceGroups()}>
+                        {intl.get("service.importGroups")}
+                    </FlatButton>
+                </MessageBar>
+            )}
+            <div className={classes.toolbar}>
+                <label className={classes.search}>
+                    <Search20Regular />
+                    <input
+                        aria-label={intl.get("groupSettings.search")}
+                        placeholder={intl.get("groupSettings.search")}
+                        value={query}
+                        onChange={event => setQuery(event.target.value)}
+                    />
+                </label>
+                <SettingsDropdown
+                    styleClass={styles.filter}
+                    aria-label={intl.get("groupSettings.filter")}
+                    selectedKey={filter}
+                    options={["all", "auto", "manual", "ungrouped"].map(
+                        key => ({ key, text: intl.get(`groupSettings.${key}`) })
+                    )}
+                    onChange={(_, option) => setFilter(String(option.key))}
+                />
+                <FlatButton
+                    styleClass={mergeClasses(classes.button, classes.primary)}
+                    disabled={busy}
+                    onClick={() => {
+                        setCreating(true)
+                        setError("")
+                    }}>
+                    <Add20Regular />
+                    {intl.get("groups.create")}
+                </FlatButton>
+            </div>
+            <div className={styles.layout}>
+                <section
+                    className={classes.list}
+                    aria-label={intl.get("groups.group")}>
+                    <div className={classes.listHeader}>
+                        <span>
+                            {intl.get("groupSettings.count", {
+                                count: visible.filter(
+                                    folder => folder.key !== "ungrouped"
+                                ).length,
+                            })}
+                        </span>
+                        <FlatButton
+                            styleClass={styles.grip}
+                            ariaLabel={intl.get("groupSettings.sortName")}
+                            title={intl.get("groupSettings.sortName")}
+                            disabled={busy || orderable.length < 2}
+                            onClick={sortByName}>
+                            <ArrowSort20Regular />
+                        </FlatButton>
+                    </div>
+                    {creating && (
+                        <form className={styles.create} onSubmit={create}>
+                            <input
+                                autoFocus
+                                className={classes.input}
+                                aria-label={intl.get("groups.enterName")}
+                                placeholder={intl.get("groups.enterName")}
+                                value={newName}
+                                onChange={event =>
+                                    setNewName(event.target.value)
+                                }
+                                disabled={busy}
+                                maxLength={200}
+                            />
+                            <div className={styles.createActions}>
+                                <FlatButton
+                                    styleClass={classes.button}
+                                    disabled={busy}
+                                    onClick={() => {
+                                        setCreating(false)
+                                        setNewName("")
+                                        setError("")
+                                    }}>
+                                    {intl.get("cancel")}
+                                </FlatButton>
+                                <button
+                                    className={mergeClasses(
+                                        classes.button,
+                                        classes.primary
+                                    )}
+                                    type="submit"
+                                    disabled={busy || !newName.trim()}>
+                                    {intl.get("create")}
+                                </button>
+                            </div>
+                        </form>
+                    )}
+                    <div
+                        ref={groupDrag.listRef}
+                        className={styles.list}
+                        data-group-list>
+                        {visible.map(item => (
+                            <div
+                                key={item.key}
+                                data-group-key={item.key}
+                                data-reorder-id={item.key}
+                                className={mergeClasses(
+                                    styles.groupRow,
+                                    selectedKey === item.key &&
+                                        classes.selected,
+                                    groupDrag.over === item.key && styles.drop
+                                )}>
+                                {item.key !== "ungrouped" && (
+                                    <button
+                                        type="button"
+                                        className={styles.grip}
+                                        aria-label={intl.get(
+                                            "groupSettings.reorder",
+                                            { name: label(item) }
+                                        )}
+                                        {...groupDrag.handleProps(item.key)}>
+                                        <ReOrderDotsVertical20Regular />
+                                    </button>
+                                )}
+                                <button
+                                    type="button"
+                                    className={classes.rowButton}
+                                    disabled={busy}
+                                    aria-pressed={selectedKey === item.key}
+                                    onClick={() => void selectFolder(item.key)}>
+                                    {item.index === undefined &&
+                                    item.key !== "ungrouped" ? (
+                                        <Globe20Regular
+                                            className={styles.groupIcon}
+                                        />
+                                    ) : (
+                                        <Folder20Regular
+                                            className={styles.groupIcon}
+                                        />
+                                    )}
+                                    <span className={classes.copy}>
+                                        <strong>{label(item)}</strong>
+                                        <span className={classes.hint}>
+                                            {kindText(item)}
+                                            {item.key !== "ungrouped" &&
+                                                ` · ${frequencyText(
+                                                    policyFor(item).frequency ??
+                                                        preferences.frequency
+                                                )}`}
+                                        </span>
+                                    </span>
+                                    <span className={styles.count}>
+                                        {item.sids.length}
+                                    </span>
+                                </button>
+                            </div>
+                        ))}
+                        {!visible.length && (
+                            <p className={classes.empty}>
+                                {intl.get("groupSettings.noGroups")}
+                            </p>
                         )}
-                    </>
-                ) : null}
-            </SettingsSection>
-            <GroupPolicySettings />
+                    </div>
+                    <div className={styles.footer}>
+                        {intl.get("groupSettings.sortHint")}
+                    </div>
+                </section>
+                <section
+                    className={classes.details}
+                    aria-label={intl.get("groupSettings.details")}>
+                    {!folder ? (
+                        <p className={classes.empty}>
+                            {intl.get("groupSettings.choose")}
+                        </p>
+                    ) : (
+                        <>
+                            <header className={classes.heading}>
+                                {folder.index === undefined && !ungrouped ? (
+                                    <Globe20Regular
+                                        className={styles.groupIcon}
+                                    />
+                                ) : (
+                                    <Folder20Regular
+                                        className={styles.groupIcon}
+                                    />
+                                )}
+                                <div>
+                                    <h2 className={classes.title}>
+                                        {label(folder)}
+                                    </h2>
+                                    <p className={classes.hint}>
+                                        {kindText(folder)} ·{" "}
+                                        {intl.get(
+                                            "subscriptionSettings.count",
+                                            { count: folder.sids.length }
+                                        )}
+                                    </p>
+                                </div>
+                            </header>
+                            {!ungrouped && (
+                                <div
+                                    className={styles.tabs}
+                                    role="tablist"
+                                    aria-label={intl.get(
+                                        "groupSettings.details"
+                                    )}>
+                                    {(["rules", "sources"] as const).map(
+                                        (key, index) => (
+                                            <button
+                                                key={key}
+                                                type="button"
+                                                id={`group-tab-${key}`}
+                                                role="tab"
+                                                aria-selected={tab === key}
+                                                aria-controls="group-detail-panel"
+                                                disabled={busy}
+                                                className={mergeClasses(
+                                                    styles.tab,
+                                                    tab === key &&
+                                                        styles.activeTab
+                                                )}
+                                                onClick={() => setTab(key)}
+                                                onKeyDown={event => {
+                                                    if (
+                                                        event.key !==
+                                                            "ArrowLeft" &&
+                                                        event.key !==
+                                                            "ArrowRight"
+                                                    )
+                                                        return
+                                                    event.preventDefault()
+                                                    const next =
+                                                        index === 0
+                                                            ? "sources"
+                                                            : "rules"
+                                                    setTab(next)
+                                                    document
+                                                        .getElementById(
+                                                            `group-tab-${next}`
+                                                        )
+                                                        ?.focus()
+                                                }}>
+                                                {key === "rules"
+                                                    ? intl.get(
+                                                          "policy.groupDefaults"
+                                                      )
+                                                    : intl.get(
+                                                          "groupSettings.members",
+                                                          {
+                                                              count: folder.sids
+                                                                  .length,
+                                                          }
+                                                      )}
+                                            </button>
+                                        )
+                                    )}
+                                </div>
+                            )}
+                            <section
+                                id="group-detail-panel"
+                                role={ungrouped ? undefined : "tabpanel"}
+                                aria-labelledby={
+                                    ungrouped ? undefined : `group-tab-${tab}`
+                                }>
+                                {tab === "rules" && !ungrouped ? (
+                                    <>
+                                        <div className={styles.policy}>
+                                            {folder.index !== undefined && (
+                                                <label
+                                                    className={classes.field}
+                                                    htmlFor="group-settings-name">
+                                                    {intl.get("name")}
+                                                    <input
+                                                        id="group-settings-name"
+                                                        className={
+                                                            classes.input
+                                                        }
+                                                        disabled={busy}
+                                                        value={name}
+                                                        onChange={event => {
+                                                            setName(
+                                                                event.target
+                                                                    .value
+                                                            )
+                                                            setDirty(true)
+                                                            setNotice("")
+                                                        }}
+                                                    />
+                                                </label>
+                                            )}
+                                            <GroupPolicySettings
+                                                key={folder.key}
+                                                value={draft}
+                                                onChange={changePolicy}
+                                                disabled={busy}
+                                            />
+                                        </div>
+                                        <div className={classes.actions}>
+                                            {folder.index !== undefined && (
+                                                <FlatButton
+                                                    styleClass={mergeClasses(
+                                                        classes.button,
+                                                        classes.danger
+                                                    )}
+                                                    disabled={busy}
+                                                    onClick={() =>
+                                                        void deleteFolder()
+                                                    }>
+                                                    {intl.get(
+                                                        "groups.deleteGroup"
+                                                    )}
+                                                </FlatButton>
+                                            )}
+                                            <FlatButton
+                                                styleClass={classes.button}
+                                                disabled={busy || !dirty}
+                                                onClick={reset}>
+                                                {intl.get("cancel")}
+                                            </FlatButton>
+                                            <FlatButton
+                                                styleClass={mergeClasses(
+                                                    classes.button,
+                                                    classes.primary
+                                                )}
+                                                disabled={busy || !dirty}
+                                                onClick={() => void save()}>
+                                                {intl.get("policy.save")}
+                                            </FlatButton>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className={styles.sourceTools}>
+                                            <label className={classes.search}>
+                                                <Search20Regular />
+                                                <input
+                                                    aria-label={intl.get(
+                                                        "groupSettings.sourceSearch"
+                                                    )}
+                                                    placeholder={intl.get(
+                                                        "groupSettings.sourceSearch"
+                                                    )}
+                                                    value={sourceQuery}
+                                                    onChange={event =>
+                                                        setSourceQuery(
+                                                            event.target.value
+                                                        )
+                                                    }
+                                                />
+                                            </label>
+                                            {folder.index !== undefined && (
+                                                <FlatButton
+                                                    styleClass={classes.button}
+                                                    disabled={busy}
+                                                    onClick={() => {
+                                                        setAddingSources(
+                                                            !addingSources
+                                                        )
+                                                        setChecked([])
+                                                        setSourceQuery("")
+                                                    }}>
+                                                    {addingSources ? (
+                                                        <ArrowLeft20Regular />
+                                                    ) : (
+                                                        <Add20Regular />
+                                                    )}
+                                                    {intl.get(
+                                                        addingSources
+                                                            ? "groupSettings.backMembers"
+                                                            : "groupSettings.addMembers"
+                                                    )}
+                                                </FlatButton>
+                                            )}
+                                        </div>
+                                        <div className={styles.sourceTools}>
+                                            <input
+                                                type="checkbox"
+                                                aria-label={intl.get(
+                                                    "subscriptionSettings.selectVisible"
+                                                )}
+                                                disabled={
+                                                    busy || !members.length
+                                                }
+                                                checked={
+                                                    members.length > 0 &&
+                                                    members.every(source =>
+                                                        checked.includes(
+                                                            source.sid
+                                                        )
+                                                    )
+                                                }
+                                                onChange={event =>
+                                                    setChecked(
+                                                        event.target.checked
+                                                            ? [
+                                                                  ...new Set([
+                                                                      ...checked,
+                                                                      ...members.map(
+                                                                          source =>
+                                                                              source.sid
+                                                                      ),
+                                                                  ]),
+                                                              ]
+                                                            : checked.filter(
+                                                                  id =>
+                                                                      !members.some(
+                                                                          source =>
+                                                                              source.sid ===
+                                                                              id
+                                                                      )
+                                                              )
+                                                    )
+                                                }
+                                            />
+                                            <span className={classes.hint}>
+                                                {intl.get(
+                                                    addingSources
+                                                        ? "groupSettings.available"
+                                                        : "subscriptionSettings.selectedCount",
+                                                    {
+                                                        count: addingSources
+                                                            ? members.length
+                                                            : checked.length,
+                                                    }
+                                                )}
+                                            </span>
+                                            {!ungrouped && !addingSources && (
+                                                <FlatButton
+                                                    styleClass={classes.button}
+                                                    disabled={
+                                                        busy || !checked.length
+                                                    }
+                                                    onClick={() =>
+                                                        void remove(checked)
+                                                    }>
+                                                    {intl.get(
+                                                        "groupSettings.remove"
+                                                    )}
+                                                </FlatButton>
+                                            )}
+                                            {addingSources && (
+                                                <FlatButton
+                                                    styleClass={mergeClasses(
+                                                        classes.button,
+                                                        classes.primary
+                                                    )}
+                                                    disabled={
+                                                        busy || !checked.length
+                                                    }
+                                                    onClick={() =>
+                                                        void addMembers()
+                                                    }>
+                                                    {intl.get(
+                                                        "groupSettings.addSelected"
+                                                    )}
+                                                </FlatButton>
+                                            )}
+                                        </div>
+                                        <div
+                                            ref={sourceDrag.listRef}
+                                            className={styles.sources}
+                                            data-group-members>
+                                            {members.map(source => (
+                                                <div
+                                                    key={source.sid}
+                                                    data-member-id={source.sid}
+                                                    data-reorder-id={String(
+                                                        source.sid
+                                                    )}
+                                                    className={mergeClasses(
+                                                        classes.row,
+                                                        sourceDrag.over ===
+                                                            String(
+                                                                source.sid
+                                                            ) && styles.drop
+                                                    )}>
+                                                    {!addingSources && (
+                                                        <button
+                                                            type="button"
+                                                            className={
+                                                                styles.grip
+                                                            }
+                                                            aria-label={intl.get(
+                                                                "groupSettings.reorder",
+                                                                {
+                                                                    name: source.name,
+                                                                }
+                                                            )}
+                                                            {...sourceDrag.handleProps(
+                                                                String(
+                                                                    source.sid
+                                                                )
+                                                            )}>
+                                                            <ReOrderDotsVertical20Regular />
+                                                        </button>
+                                                    )}
+                                                    <input
+                                                        type="checkbox"
+                                                        aria-label={intl.get(
+                                                            "subscriptionSettings.selectSource",
+                                                            {
+                                                                name: source.name,
+                                                            }
+                                                        )}
+                                                        disabled={busy}
+                                                        checked={checked.includes(
+                                                            source.sid
+                                                        )}
+                                                        onChange={event =>
+                                                            setChecked(
+                                                                event.target
+                                                                    .checked
+                                                                    ? [
+                                                                          ...checked,
+                                                                          source.sid,
+                                                                      ]
+                                                                    : checked.filter(
+                                                                          id =>
+                                                                              id !==
+                                                                              source.sid
+                                                                      )
+                                                            )
+                                                        }
+                                                    />
+                                                    {source.iconurl && (
+                                                        <img
+                                                            src={source.iconurl}
+                                                            alt=""
+                                                            className={
+                                                                classes.icon
+                                                            }
+                                                            draggable={false}
+                                                        />
+                                                    )}
+                                                    <div
+                                                        className={
+                                                            styles.sourceName
+                                                        }>
+                                                        <strong>
+                                                            {source.name}
+                                                        </strong>
+                                                        <div
+                                                            className={
+                                                                classes.hint
+                                                            }>
+                                                            {intl.get(
+                                                                `contentView.${
+                                                                    source.category ||
+                                                                    "articles"
+                                                                }`
+                                                            )}
+                                                            {(source.policy
+                                                                ?.readBehavior !==
+                                                                undefined ||
+                                                                source.policy
+                                                                    ?.strategy !==
+                                                                    undefined ||
+                                                                sourceFrequency(
+                                                                    source
+                                                                ) !==
+                                                                    undefined) &&
+                                                                ` · ${intl.get(
+                                                                    "groupSettings.sourceOverride"
+                                                                )}`}
+                                                        </div>
+                                                    </div>
+                                                    {!addingSources && (
+                                                        <FlatButton
+                                                            styleClass={
+                                                                classes.button
+                                                            }
+                                                            ariaLabel={intl.get(
+                                                                "edit"
+                                                            )}
+                                                            disabled={busy}
+                                                            onClick={() =>
+                                                                void openEditor(
+                                                                    source
+                                                                )
+                                                            }>
+                                                            {intl.get("edit")}
+                                                        </FlatButton>
+                                                    )}
+                                                    {!addingSources &&
+                                                        !ungrouped && (
+                                                            <FlatButton
+                                                                styleClass={
+                                                                    classes.button
+                                                                }
+                                                                disabled={busy}
+                                                                onClick={() =>
+                                                                    void remove(
+                                                                        [
+                                                                            source.sid,
+                                                                        ]
+                                                                    )
+                                                                }>
+                                                                {intl.get(
+                                                                    "subscriptions.removeFromGroup"
+                                                                )}
+                                                            </FlatButton>
+                                                        )}
+                                                </div>
+                                            ))}
+                                            {!members.length && (
+                                                <p className={classes.empty}>
+                                                    {intl.get(
+                                                        addingSources
+                                                            ? "groupSettings.noAvailable"
+                                                            : "subscriptionSettings.noResults"
+                                                    )}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </>
+                                )}
+                            </section>
+                        </>
+                    )}
+                    {error && (
+                        <p
+                            role="alert"
+                            className={mergeClasses(
+                                styles.status,
+                                styles.error
+                            )}>
+                            {error}
+                        </p>
+                    )}
+                    {notice && (
+                        <p role="status" className={styles.status}>
+                            {notice}
+                        </p>
+                    )}
+                </section>
+            </div>
         </div>
     )
 }
-
-export default GroupsTab

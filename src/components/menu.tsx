@@ -145,6 +145,9 @@ export const Menu: React.FC = () => {
     const selected = useAppSelector(s => s.app.menuKey)
     const view = useAppSelector(s => s.page.contentView)
     const privacyMode = useAppSelector(s => s.app.privacyMode)
+    const groupOrder = useAppSelector(
+        state => state.page.readerPreferences.groupOrder
+    )
     const [adding, setAdding] = useState(false)
     const [url, setUrl] = useState("")
     const [category, setCategory] = useState(SourceCategory.Articles)
@@ -171,7 +174,9 @@ export const Menu: React.FC = () => {
             (view === "all" ||
                 (source.category || SourceCategory.Articles) === view)
     )
-    const { folders, singles } = sidebarGroups(groups, visible)
+    const { folders, singles } = sidebarGroups(groups, visible, {
+        order: groupOrder,
+    })
     const unread = visible.reduce(
         (total, source) => total + source.unreadCount,
         0

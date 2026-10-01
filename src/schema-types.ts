@@ -57,6 +57,7 @@ export interface ReaderPreferences {
     strategy: UpdateStrategy
     backgroundSiteLimit: number // requests per website per rolling hour
     domainPolicies: Record<string, SubscriptionPolicy>
+    groupOrder: string[]
 }
 export const defaultReaderPreferences: ReaderPreferences = {
     startupFetch: true,
@@ -67,6 +68,7 @@ export const defaultReaderPreferences: ReaderPreferences = {
     strategy: "interval",
     backgroundSiteLimit: 4,
     domainPolicies: {},
+    groupOrder: [],
 }
 export interface FeedScheduleState {
     sources: Record<
