@@ -1,10 +1,12 @@
+import { SettingsDropdown as Dropdown } from "../utils/settings-dropdown"
 import * as React from "react"
 import intl from "react-intl-universal"
-import { Toggle, Dropdown, SpinButton } from "@fluentui/react"
+import { Toggle, SpinButton } from "@fluentui/react"
 import { useAppDispatch, useAppSelector } from "../../scripts/reducer"
 import { setReaderPreferences } from "../../scripts/models/page"
 import { ReaderPreferences } from "../../schema-types"
 import { SubscriptionPolicyFields } from "../utils/subscription-policy-fields"
+import { SettingsSection } from "../utils/settings-section"
 
 export default function ReaderPreferenceSettings() {
     const dispatch = useAppDispatch()
@@ -97,14 +99,13 @@ export default function ReaderPreferenceSettings() {
                     }}
                 />
             </div>
-            <div className="modern-setting-row">
-                <div className="modern-setting-copy">
-                    <strong>{intl.get("policy.defaults")}</strong>
-                    <p>{intl.get("policy.priorityHint")}</p>
-                </div>
+            <SettingsSection
+                title={intl.get("policy.defaults")}
+                description={intl.get("policy.priorityHint")}>
                 <SubscriptionPolicyFields
                     id="reader-default"
                     inherited={false}
+                    layout="rows"
                     value={{
                         readBehavior: value.readBehavior,
                         frequency: value.frequency,
@@ -118,7 +119,7 @@ export default function ReaderPreferenceSettings() {
                         })
                     }
                 />
-            </div>
+            </SettingsSection>
             <div className="modern-setting-row">
                 <div className="modern-setting-copy">
                     <strong>{intl.get("policy.readingMode")}</strong>

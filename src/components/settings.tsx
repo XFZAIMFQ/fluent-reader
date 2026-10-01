@@ -12,9 +12,28 @@ import ServiceTabContainer from "../containers/settings/service-container"
 import { initTouchBarWithTexts } from "../scripts/utils"
 import { useAppSelector, useAppDispatch } from "../scripts/reducer"
 import { exitSettings } from "../scripts/models/app"
-import { makeStyles } from "@griffel/react"
+import { makeStyles, mergeClasses } from "@griffel/react"
+import { usePanelDrag } from "./utils/use-panel-drag"
 
 const useStyles = makeStyles({
+    panel: { WebkitAppRegion: "no-drag" },
+    main: {
+        "&[role='tabpanel']": {
+            height: "auto",
+            padding: 0,
+            overflow: "hidden",
+        },
+        "& .modern-setting-row": {
+            "@media (max-width: 760px)": {
+                gridTemplateColumns: "minmax(0, 1fr)",
+                gap: "8px",
+            },
+        },
+        "& .modern-setting-row > .ms-Stack .ms-StackItem": { marginBottom: 0 },
+    },
+    scroll: { scrollbarGutter: "stable" },
+    handle: { cursor: "grab", touchAction: "none", userSelect: "none" },
+    dragging: { cursor: "grabbing" },
     updateStatus: {
         margin: "0 30px 8px",
         padding: "10px 12px",
@@ -47,6 +66,7 @@ const Settings: React.FC = () => {
     const dispatch = useAppDispatch()
     const classes = useStyles()
     const display = useAppSelector(s => s.app.settings.display)
+    const drag = usePanelDrag(display)
     const selectedSids = useAppSelector(s => s.app.settings.sids)
     const blocked = useAppSelector(
         s => !s.app.sourceInit || s.app.syncing || s.app.settings.saving
@@ -97,13 +117,26 @@ const Settings: React.FC = () => {
     return (
         <div className="settings-container modern-settings-backdrop">
             <div
-                className="settings modern-settings-panel"
+                ref={drag.panelRef}
+                className={mergeClasses(
+                    "settings modern-settings-panel",
+                    classes.panel
+                )}
+                style={{
+                    transform: `translate(${drag.offset.x}px, ${drag.offset.y}px)`,
+                }}
                 role="dialog"
                 aria-modal
                 aria-label={intl.get("settings.name")}>
                 <aside className="modern-settings-sidebar">
-                    <div className="modern-settings-brand">
-                        <img src="icons/logo.svg" alt="" />
+                    <div
+                        className={mergeClasses(
+                            "modern-settings-brand",
+                            classes.handle,
+                            drag.dragging && classes.dragging
+                        )}
+                        {...drag.handlers}>
+                        <img src="icons/logo.svg" alt="" draggable={false} />
                         <strong>Fluent Reader</strong>
                     </div>
                     <nav
@@ -149,10 +182,19 @@ const Settings: React.FC = () => {
                 </aside>
                 <main
                     id="modern-settings-content"
-                    className="modern-settings-main"
+                    className={mergeClasses(
+                        "modern-settings-main",
+                        classes.main
+                    )}
                     role="tabpanel"
                     aria-labelledby={`modern-settings-tab-${active}`}>
-                    <header className="modern-settings-header">
+                    <header
+                        className={mergeClasses(
+                            "modern-settings-header",
+                            classes.handle,
+                            drag.dragging && classes.dragging
+                        )}
+                        {...drag.handlers}>
                         <h1>
                             <Icon
                                 iconName={tabs.find(t => t.key === active).icon}
@@ -178,7 +220,12 @@ const Settings: React.FC = () => {
                             )}
                         </p>
                     )}
-                    <div className="modern-settings-scroll" key={active}>
+                    <div
+                        className={mergeClasses(
+                            "modern-settings-scroll",
+                            classes.scroll
+                        )}
+                        key={active}>
                         {content[active]}
                     </div>
                 </main>

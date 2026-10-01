@@ -1,10 +1,10 @@
+import { SettingsDropdown as Dropdown } from "../utils/settings-dropdown"
 import * as React from "react"
 import intl from "react-intl-universal"
 import { SourceState, RSSSource } from "../../scripts/models/source"
 import {
     Stack,
     Label,
-    Dropdown,
     IDropdownOption,
     TextField,
     PrimaryButton,

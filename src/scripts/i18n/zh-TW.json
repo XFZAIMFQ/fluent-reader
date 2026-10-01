@@ -151,6 +151,7 @@
         "hidden": "從“全部文章”中隱藏"
     },
     "groups": {
+        "management": "群組管理與排序",
         "exist": "該分組已存在",
         "type": "類型",
         "group": "分組",

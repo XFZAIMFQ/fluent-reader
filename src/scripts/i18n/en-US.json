@@ -170,6 +170,7 @@
         "privateDescription": "When privacy mode is on, hide this subscription and its articles from the sidebar and timeline."
     },
     "groups": {
+        "management": "Group management and ordering",
         "exist": "This group already exists.",
         "type": "Type",
         "group": "Group",

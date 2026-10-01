@@ -1,3 +1,4 @@
+import { SettingsDropdown as Dropdown } from "../../utils/settings-dropdown"
 import * as React from "react"
 import intl from "react-intl-universal"
 import { ServiceConfigsTabProps } from "../service"
@@ -12,7 +13,6 @@ import {
     Checkbox,
     MessageBar,
     MessageBarType,
-    Dropdown,
     IDropdownOption,
     MessageBarButton,
     Link,

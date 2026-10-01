@@ -1,3 +1,4 @@
+import { SettingsDropdown } from "../utils/settings-dropdown"
 import * as React from "react"
 import { useEffect, useState } from "react"
 import intl from "react-intl-universal"
@@ -320,18 +321,21 @@ const SourcesTab: React.FC = () => {
         id: string,
         placeholder?: string
     ) => (
-        <select
+        <SettingsDropdown
             id={id}
-            className={classes.input}
-            value={value}
-            onChange={event => onChange(event.target.value)}>
-            {placeholder && <option value="">{placeholder}</option>}
-            {categories.map(category => (
-                <option key={category} value={category}>
-                    {intl.get(`contentView.${category}`)}
-                </option>
-            ))}
-        </select>
+            disabled={busy}
+            selectedKey={value}
+            placeholder={placeholder}
+            aria-label={intl.get("contentView.category")}
+            onChange={(_, option) => onChange(String(option.key))}
+            options={[
+                ...(placeholder ? [{ key: "", text: placeholder }] : []),
+                ...categories.map(category => ({
+                    key: category,
+                    text: intl.get(`contentView.${category}`),
+                })),
+            ]}
+        />
     )
     const invalid = batch
         ? (!batchCategory && !batchGroup) ||
@@ -357,20 +361,24 @@ const SourcesTab: React.FC = () => {
                         onChange={event => setQuery(event.target.value)}
                     />
                 </label>
-                <select
-                    className={mergeClasses(classes.input, classes.filter)}
+                <SettingsDropdown
+                    styleClass={classes.filter}
                     aria-label={intl.get("contentView.category")}
-                    value={filter}
-                    onChange={event => setFilter(event.target.value)}>
-                    <option value="all">
-                        {intl.get("subscriptionSettings.allCategories")}
-                    </option>
-                    {categories.map(category => (
-                        <option key={category} value={category}>
-                            {intl.get(`contentView.${category}`)}
-                        </option>
-                    ))}
-                </select>
+                    selectedKey={filter}
+                    onChange={(_, option) => setFilter(String(option.key))}
+                    options={[
+                        {
+                            key: "all",
+                            text: intl.get(
+                                "subscriptionSettings.allCategories"
+                            ),
+                        },
+                        ...categories.map(category => ({
+                            key: category,
+                            text: intl.get(`contentView.${category}`),
+                        })),
+                    ]}
+                />
                 <FlatButton
                     styleClass={mergeClasses(classes.button, classes.primary)}
                     disabled={busy}
@@ -773,6 +781,7 @@ const SourcesTab: React.FC = () => {
                                             <div>
                                                 <SubscriptionPolicyFields
                                                     id="settings-source-policy"
+                                                    disabled={busy}
                                                     value={draft.policy}
                                                     onChange={policy =>
                                                         change({ policy })
@@ -792,55 +801,50 @@ const SourcesTab: React.FC = () => {
                                                     {intl.get(
                                                         "sources.openTarget"
                                                     )}
-                                                    <select
+                                                    <SettingsDropdown
                                                         id="settings-source-target"
-                                                        className={
-                                                            classes.input
+                                                        disabled={busy}
+                                                        aria-label={intl.get(
+                                                            "sources.openTarget"
+                                                        )}
+                                                        selectedKey={
+                                                            draft.openTarget
                                                         }
-                                                        value={draft.openTarget}
-                                                        onChange={event =>
+                                                        onChange={(_, option) =>
                                                             change({
                                                                 openTarget:
                                                                     Number(
-                                                                        event
-                                                                            .target
-                                                                            .value
+                                                                        option.key
                                                                     ),
                                                             })
-                                                        }>
-                                                        <option
-                                                            value={
-                                                                SourceOpenTarget.Local
-                                                            }>
-                                                            {intl.get(
-                                                                "sources.rssText"
-                                                            )}
-                                                        </option>
-                                                        <option
-                                                            value={
-                                                                SourceOpenTarget.FullContent
-                                                            }>
-                                                            {intl.get(
-                                                                "article.loadFull"
-                                                            )}
-                                                        </option>
-                                                        <option
-                                                            value={
-                                                                SourceOpenTarget.Webpage
-                                                            }>
-                                                            {intl.get(
-                                                                "sources.loadWebpage"
-                                                            )}
-                                                        </option>
-                                                        <option
-                                                            value={
-                                                                SourceOpenTarget.External
-                                                            }>
-                                                            {intl.get(
-                                                                "openExternal"
-                                                            )}
-                                                        </option>
-                                                    </select>
+                                                        }
+                                                        options={[
+                                                            {
+                                                                key: SourceOpenTarget.Local,
+                                                                text: intl.get(
+                                                                    "sources.rssText"
+                                                                ),
+                                                            },
+                                                            {
+                                                                key: SourceOpenTarget.FullContent,
+                                                                text: intl.get(
+                                                                    "article.loadFull"
+                                                                ),
+                                                            },
+                                                            {
+                                                                key: SourceOpenTarget.Webpage,
+                                                                text: intl.get(
+                                                                    "sources.loadWebpage"
+                                                                ),
+                                                            },
+                                                            {
+                                                                key: SourceOpenTarget.External,
+                                                                text: intl.get(
+                                                                    "openExternal"
+                                                                ),
+                                                            },
+                                                        ]}
+                                                    />
                                                 </label>
                                                 <label
                                                     className={classes.toggle}>

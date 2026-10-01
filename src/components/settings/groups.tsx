@@ -1,3 +1,4 @@
+import { SettingsDropdown as Dropdown } from "../utils/settings-dropdown"
 import * as React from "react"
 import intl from "react-intl-universal"
 import { SourceGroup } from "../../schema-types"
@@ -12,7 +13,6 @@ import {
     TextField,
     PrimaryButton,
     DefaultButton,
-    Dropdown,
     IDropdownOption,
     CommandBarButton,
     MarqueeSelection,
@@ -23,6 +23,7 @@ import {
 } from "@fluentui/react"
 import DangerButton from "../utils/danger-button"
 import GroupPolicySettings from "./group-policy"
+import { SettingsSection } from "../utils/settings-section"
 
 type GroupsTabProps = {
     sources: SourceState
@@ -324,192 +325,209 @@ class GroupsTab extends React.Component<GroupsTabProps, GroupsTabState> {
 
     render = () => (
         <div className="tab-body">
-            <GroupPolicySettings />
-            {this.state.manageGroup && this.state.selectedGroup && (
-                <>
-                    <Stack
-                        horizontal
-                        horizontalAlign="space-between"
-                        style={{ height: 40 }}>
-                        <CommandBarButton
-                            text={intl.get("groups.exitGroup")}
-                            iconProps={{ iconName: "BackToWindow" }}
-                            onClick={() =>
-                                this.setState({ manageGroup: false })
-                            }
-                        />
-                        {this.state.selectedSources != null && (
+            <SettingsSection title={intl.get("groups.management")}>
+                {this.state.manageGroup && this.state.selectedGroup && (
+                    <>
+                        <Stack
+                            horizontal
+                            horizontalAlign="space-between"
+                            style={{ height: 40 }}>
                             <CommandBarButton
-                                text={intl.get("groups.deleteSource")}
-                                onClick={this.removeFromGroup}
-                                iconProps={{
-                                    iconName: "RemoveFromShoppingList",
-                                    style: { color: "#d13438" },
-                                }}
+                                text={intl.get("groups.exitGroup")}
+                                iconProps={{ iconName: "BackToWindow" }}
+                                onClick={() =>
+                                    this.setState({ manageGroup: false })
+                                }
                             />
-                        )}
-                    </Stack>
+                            {this.state.selectedSources != null && (
+                                <CommandBarButton
+                                    text={intl.get("groups.deleteSource")}
+                                    onClick={this.removeFromGroup}
+                                    iconProps={{
+                                        iconName: "RemoveFromShoppingList",
+                                        style: { color: "#d13438" },
+                                    }}
+                                />
+                            )}
+                        </Stack>
 
-                    <MarqueeSelection
-                        selection={this.sourcesSelection}
-                        isDraggingConstrainedToRoot={true}>
+                        <MarqueeSelection
+                            selection={this.sourcesSelection}
+                            isDraggingConstrainedToRoot={true}>
+                            <DetailsList
+                                compact={true}
+                                items={this.state.selectedGroup.sids.map(
+                                    sid => this.props.sources[sid]
+                                )}
+                                columns={this.sourceColumns}
+                                dragDropEvents={this.sourcesDragDropEvents}
+                                setKey="multiple"
+                                selection={this.sourcesSelection}
+                                selectionMode={SelectionMode.multiple}
+                            />
+                        </MarqueeSelection>
+
+                        <span className="settings-hint">
+                            {intl.get("groups.sourceHint")}
+                        </span>
+                    </>
+                )}
+                {!this.state.manageGroup || !this.state.selectedGroup ? (
+                    <>
+                        {this.props.serviceOn && (
+                            <MessageBar
+                                messageBarType={MessageBarType.info}
+                                isMultiline={false}
+                                actions={
+                                    <MessageBarButton
+                                        text={intl.get("service.importGroups")}
+                                        onClick={this.props.importGroups}
+                                    />
+                                }>
+                                {intl.get("service.groupsWarning")}
+                            </MessageBar>
+                        )}
+                        <form
+                            className="modern-setting-row"
+                            onSubmit={this.createGroup}>
+                            <div className="modern-setting-copy">
+                                <label htmlFor="newGroupName">
+                                    <strong>{intl.get("groups.create")}</strong>
+                                </label>
+                            </div>
+                            <Stack horizontal>
+                                <Stack.Item grow>
+                                    <TextField
+                                        onGetErrorMessage={
+                                            this.validateNewGroupName
+                                        }
+                                        validateOnLoad={false}
+                                        placeholder={intl.get(
+                                            "groups.enterName"
+                                        )}
+                                        value={this.state.newGroupName}
+                                        id="newGroupName"
+                                        name="newGroupName"
+                                        onChange={this.handleInputChange}
+                                    />
+                                </Stack.Item>
+                                <Stack.Item>
+                                    <PrimaryButton
+                                        disabled={
+                                            this.validateNewGroupName(
+                                                this.state.newGroupName
+                                            ) !== ""
+                                        }
+                                        type="submit"
+                                        text={intl.get("create")}
+                                    />
+                                </Stack.Item>
+                            </Stack>
+                        </form>
+
                         <DetailsList
                             compact={true}
-                            items={this.state.selectedGroup.sids.map(
-                                sid => this.props.sources[sid]
-                            )}
-                            columns={this.sourceColumns}
-                            dragDropEvents={this.sourcesDragDropEvents}
-                            setKey="multiple"
-                            selection={this.sourcesSelection}
-                            selectionMode={SelectionMode.multiple}
+                            items={this.props.groups}
+                            columns={this.groupColumns()}
+                            setKey="selected"
+                            onItemInvoked={this.manageGroup}
+                            dragDropEvents={this.groupDragDropEvents}
+                            selection={this.groupSelection}
+                            selectionMode={SelectionMode.single}
                         />
-                    </MarqueeSelection>
 
-                    <span className="settings-hint">
-                        {intl.get("groups.sourceHint")}
-                    </span>
-                </>
-            )}
-            {!this.state.manageGroup || !this.state.selectedGroup ? (
-                <>
-                    {this.props.serviceOn && (
-                        <MessageBar
-                            messageBarType={MessageBarType.info}
-                            isMultiline={false}
-                            actions={
-                                <MessageBarButton
-                                    text={intl.get("service.importGroups")}
-                                    onClick={this.props.importGroups}
-                                />
-                            }>
-                            {intl.get("service.groupsWarning")}
-                        </MessageBar>
-                    )}
-                    <form onSubmit={this.createGroup}>
-                        <Label htmlFor="newGroupName">
-                            {intl.get("groups.create")}
-                        </Label>
-                        <Stack horizontal>
-                            <Stack.Item grow>
-                                <TextField
-                                    onGetErrorMessage={
-                                        this.validateNewGroupName
-                                    }
-                                    validateOnLoad={false}
-                                    placeholder={intl.get("groups.enterName")}
-                                    value={this.state.newGroupName}
-                                    id="newGroupName"
-                                    name="newGroupName"
-                                    onChange={this.handleInputChange}
-                                />
-                            </Stack.Item>
-                            <Stack.Item>
-                                <PrimaryButton
-                                    disabled={
-                                        this.validateNewGroupName(
-                                            this.state.newGroupName
-                                        ) !== ""
-                                    }
-                                    type="sumbit"
-                                    text={intl.get("create")}
-                                />
-                            </Stack.Item>
-                        </Stack>
-                    </form>
-
-                    <DetailsList
-                        compact={true}
-                        items={this.props.groups}
-                        columns={this.groupColumns()}
-                        setKey="selected"
-                        onItemInvoked={this.manageGroup}
-                        dragDropEvents={this.groupDragDropEvents}
-                        selection={this.groupSelection}
-                        selectionMode={SelectionMode.single}
-                    />
-
-                    {this.state.selectedGroup ? (
-                        this.state.selectedGroup.isMultiple ? (
-                            <>
-                                <Label>
-                                    {intl.get("groups.selectedGroup")}
-                                </Label>
-                                <Stack horizontal>
-                                    <Stack.Item grow>
-                                        <TextField
-                                            onGetErrorMessage={
-                                                this.validateEditedGroupName
-                                            }
-                                            validateOnLoad={false}
-                                            placeholder={intl.get(
-                                                "groups.enterName"
-                                            )}
-                                            value={this.state.editGroupName}
-                                            name="editGroupName"
-                                            onChange={this.handleInputChange}
-                                        />
-                                    </Stack.Item>
-                                    <Stack.Item>
-                                        <DefaultButton
-                                            disabled={
-                                                this.validateEditedGroupName(
-                                                    this.state.editGroupName
-                                                ) !== ""
-                                            }
-                                            onClick={this.updateGroupName}
-                                            text={intl.get("groups.editName")}
-                                        />
-                                    </Stack.Item>
-                                    <Stack.Item>
-                                        <DangerButton
-                                            key={this.state.selectedGroup.index}
-                                            onClick={this.deleteGroup}
-                                            text={intl.get(
-                                                "groups.deleteGroup"
-                                            )}
-                                        />
-                                    </Stack.Item>
-                                </Stack>
-                            </>
+                        {this.state.selectedGroup ? (
+                            this.state.selectedGroup.isMultiple ? (
+                                <>
+                                    <Label>
+                                        {intl.get("groups.selectedGroup")}
+                                    </Label>
+                                    <Stack horizontal>
+                                        <Stack.Item grow>
+                                            <TextField
+                                                onGetErrorMessage={
+                                                    this.validateEditedGroupName
+                                                }
+                                                validateOnLoad={false}
+                                                placeholder={intl.get(
+                                                    "groups.enterName"
+                                                )}
+                                                value={this.state.editGroupName}
+                                                name="editGroupName"
+                                                onChange={
+                                                    this.handleInputChange
+                                                }
+                                            />
+                                        </Stack.Item>
+                                        <Stack.Item>
+                                            <DefaultButton
+                                                disabled={
+                                                    this.validateEditedGroupName(
+                                                        this.state.editGroupName
+                                                    ) !== ""
+                                                }
+                                                onClick={this.updateGroupName}
+                                                text={intl.get(
+                                                    "groups.editName"
+                                                )}
+                                            />
+                                        </Stack.Item>
+                                        <Stack.Item>
+                                            <DangerButton
+                                                key={
+                                                    this.state.selectedGroup
+                                                        .index
+                                                }
+                                                onClick={this.deleteGroup}
+                                                text={intl.get(
+                                                    "groups.deleteGroup"
+                                                )}
+                                            />
+                                        </Stack.Item>
+                                    </Stack>
+                                </>
+                            ) : (
+                                <>
+                                    <Label>
+                                        {intl.get("groups.selectedSource")}
+                                    </Label>
+                                    <Stack horizontal>
+                                        <Stack.Item grow>
+                                            <Dropdown
+                                                placeholder={intl.get(
+                                                    "groups.chooseGroup"
+                                                )}
+                                                selectedKey={
+                                                    this.state.dropdownIndex
+                                                }
+                                                options={this.dropdownOptions()}
+                                                onChange={this.dropdownChange}
+                                            />
+                                        </Stack.Item>
+                                        <Stack.Item>
+                                            <DefaultButton
+                                                disabled={
+                                                    this.state.dropdownIndex ===
+                                                    null
+                                                }
+                                                onClick={this.addToGroup}
+                                                text={intl.get(
+                                                    "groups.addToGroup"
+                                                )}
+                                            />
+                                        </Stack.Item>
+                                    </Stack>
+                                </>
+                            )
                         ) : (
-                            <>
-                                <Label>
-                                    {intl.get("groups.selectedSource")}
-                                </Label>
-                                <Stack horizontal>
-                                    <Stack.Item grow>
-                                        <Dropdown
-                                            placeholder={intl.get(
-                                                "groups.chooseGroup"
-                                            )}
-                                            selectedKey={
-                                                this.state.dropdownIndex
-                                            }
-                                            options={this.dropdownOptions()}
-                                            onChange={this.dropdownChange}
-                                        />
-                                    </Stack.Item>
-                                    <Stack.Item>
-                                        <DefaultButton
-                                            disabled={
-                                                this.state.dropdownIndex ===
-                                                null
-                                            }
-                                            onClick={this.addToGroup}
-                                            text={intl.get("groups.addToGroup")}
-                                        />
-                                    </Stack.Item>
-                                </Stack>
-                            </>
-                        )
-                    ) : (
-                        <span className="settings-hint">
-                            {intl.get("groups.groupHint")}
-                        </span>
-                    )}
-                </>
-            ) : null}
+                            <span className="settings-hint">
+                                {intl.get("groups.groupHint")}
+                            </span>
+                        )}
+                    </>
+                ) : null}
+            </SettingsSection>
+            <GroupPolicySettings />
         </div>
     )
 }

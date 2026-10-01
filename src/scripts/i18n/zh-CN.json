@@ -168,6 +168,7 @@
         "privateDescription": "开启隐私模式时，此订阅及文章不会显示在列表和时间线中。"
     },
     "groups": {
+        "management": "分组管理与排序",
         "exist": "该分组已存在",
         "type": "类型",
         "group": "分组",

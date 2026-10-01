@@ -399,6 +399,7 @@ export function SourceEditor() {
                     <div className={classes.field}>
                         <SubscriptionPolicyFields
                             id="source-editor-policy"
+                            disabled={saving || refreshingIcon}
                             value={policy}
                             onChange={setPolicy}
                             hideFrequency={Boolean(source.serviceRef)}

@@ -1,3 +1,4 @@
+import { SettingsDropdown as Dropdown } from "../utils/settings-dropdown"
 import * as React from "react"
 import intl from "react-intl-universal"
 import {
@@ -18,7 +19,6 @@ import {
     Toggle,
     TextField,
     DefaultButton,
-    Dropdown,
     IDropdownOption,
     PrimaryButton,
 } from "@fluentui/react"
