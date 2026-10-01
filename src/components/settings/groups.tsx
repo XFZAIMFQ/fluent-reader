@@ -255,17 +255,28 @@ class GroupsTab extends React.Component<GroupsTabProps, GroupsTabState> {
     }
 
     validateNewGroupName = (v: string) => {
+        return this.validateGroupName(v)
+    }
+
+    validateGroupName = (v: string, excludeIndex?: number) => {
         const name = v.trim()
         if (name.length == 0) {
             return intl.get("emptyName")
         }
         for (let group of this.props.groups) {
-            if (group.isMultiple && group.name === name) {
+            if (
+                group.index !== excludeIndex &&
+                group.isMultiple &&
+                group.name.trim() === name
+            ) {
                 return intl.get("groups.exist")
             }
         }
         return ""
     }
+
+    validateEditedGroupName = (v: string) =>
+        this.validateGroupName(v, this.state.selectedGroup?.index)
 
     createGroup = (event: React.FormEvent) => {
         event.preventDefault()
@@ -300,6 +311,7 @@ class GroupsTab extends React.Component<GroupsTabProps, GroupsTabState> {
     }
 
     updateGroupName = () => {
+        if (this.validateEditedGroupName(this.state.editGroupName)) return
         let group = this.state.selectedGroup
         group = { ...group, name: this.state.editGroupName.trim() }
         this.props.updateGroup(group)
@@ -424,10 +436,8 @@ class GroupsTab extends React.Component<GroupsTabProps, GroupsTabState> {
                                 <Stack horizontal>
                                     <Stack.Item grow>
                                         <TextField
-                                            onGetErrorMessage={v =>
-                                                v.trim().length == 0
-                                                    ? intl.get("emptyName")
-                                                    : ""
+                                            onGetErrorMessage={
+                                                this.validateEditedGroupName
                                             }
                                             validateOnLoad={false}
                                             placeholder={intl.get(
@@ -441,8 +451,9 @@ class GroupsTab extends React.Component<GroupsTabProps, GroupsTabState> {
                                     <Stack.Item>
                                         <DefaultButton
                                             disabled={
-                                                this.state.editGroupName.trim()
-                                                    .length == 0
+                                                this.validateEditedGroupName(
+                                                    this.state.editGroupName
+                                                ) !== ""
                                             }
                                             onClick={this.updateGroupName}
                                             text={intl.get("groups.editName")}

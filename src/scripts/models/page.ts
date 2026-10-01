@@ -263,11 +263,12 @@ export function refreshSourceSelection(): AppThunk {
             )
         } else if (key.startsWith("folder-") || key.startsWith("g-")) {
             const group = key.startsWith("folder-")
-                ? state.groups.find(
-                      group =>
-                          group.isMultiple &&
-                          group.name === decodeURIComponent(key.slice(7))
-                  )
+                ? sidebarGroups(
+                      state.groups,
+                      Object.values(state.sources).filter(source =>
+                          visible(source.sid)
+                      )
+                  ).folders.find(folder => folder.key === key)
                 : state.groups[Number(key.slice(2))]
             if (group) {
                 dispatch(

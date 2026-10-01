@@ -11,6 +11,31 @@ export interface SidebarGroup {
     expanded: boolean
 }
 
+// Keep the first folder's order and expansion state when repairing old names.
+export function mergeNamedGroups(groups: SourceGroup[]): SourceGroup[] {
+    const named = new Map<string, SourceGroup>()
+    const merged: SourceGroup[] = []
+    let changed = false
+    for (const group of groups) {
+        if (!group.isMultiple) {
+            merged.push(group)
+            continue
+        }
+        const name = group.name.trim()
+        const existing = named.get(name)
+        if (existing) {
+            existing.sids = [...new Set([...existing.sids, ...group.sids])]
+            changed = true
+        } else {
+            const folder = { ...group, name, sids: [...group.sids] }
+            named.set(name, folder)
+            merged.push(folder)
+            changed ||= name !== group.name
+        }
+    }
+    return changed ? merged : groups
+}
+
 export function sidebarGroups(groups: SourceGroup[], visible: RSSSource[]) {
     const ids = new Set(visible.map(source => source.sid))
     const sourceById = new Map(visible.map(source => [source.sid, source]))
@@ -20,18 +45,25 @@ export function sidebarGroups(groups: SourceGroup[], visible: RSSSource[]) {
     ])
     const assigned = new Set<number>()
     const folders: SidebarGroup[] = []
+    const named = new Map<string, SidebarGroup>()
     groups.forEach((group, index) => {
         if (!group.isMultiple) return
         const sids = group.sids.filter(sid => ids.has(sid))
         sids.forEach(sid => assigned.add(sid))
-        if (sids.length) {
-            folders.push({
-                key: `folder-${encodeURIComponent(group.name)}`,
-                name: group.name,
+        const name = group.name.trim()
+        const existing = named.get(name)
+        if (existing) {
+            existing.sids = [...new Set([...existing.sids, ...sids])]
+        } else {
+            const folder = {
+                key: `folder-${encodeURIComponent(name)}`,
+                name,
                 sids,
                 index,
                 expanded: group.expanded,
-            })
+            }
+            named.set(name, folder)
+            folders.push(folder)
         }
     })
     const automatic = new Map<string, number[]>()
@@ -47,7 +79,13 @@ export function sidebarGroups(groups: SourceGroup[], visible: RSSSource[]) {
             ])
     }
     automatic.forEach((sids, domain) => {
-        if (sids.length >= 2) {
+        const existing = folders.find(
+            folder => folder.name.toLowerCase() === domain
+        )
+        if (existing) {
+            sids.forEach(sid => assigned.add(sid))
+            existing.sids = [...new Set([...existing.sids, ...sids])]
+        } else if (sids.length >= 2) {
             sids.forEach(sid => assigned.add(sid))
             folders.push({
                 key: `auto-${encodeURIComponent(domain)}`,
@@ -59,5 +97,5 @@ export function sidebarGroups(groups: SourceGroup[], visible: RSSSource[]) {
         }
     })
     const singles = [...orderedIds].filter(sid => !assigned.has(sid))
-    return { folders, singles }
+    return { folders: folders.filter(folder => folder.sids.length), singles }
 }

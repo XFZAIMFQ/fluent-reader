@@ -9,8 +9,7 @@ import {
     DocumentText24Regular,
     Image24Regular,
     Video24Regular,
-    ChevronDown16Regular,
-    ChevronRight16Regular,
+    ChevronRight16Filled,
     ArrowExit20Regular,
 } from "@fluentui/react-icons"
 import { ContentView, SourceCategory } from "../schema-types"
@@ -67,6 +66,7 @@ const label = (view: ContentView) =>
         : intl.get(`contentView.${view}`) || fallbackLabels[view]
 
 const useStyles = makeStyles({
+    sidebar: { position: "relative" },
     drop: {
         outline: "2px solid var(--primary)",
         backgroundColor: "var(--neutralLight)",
@@ -81,24 +81,43 @@ const useStyles = makeStyles({
     },
     star: { color: "#d99500" },
     row: { "cursor": "grab", ":active": { cursor: "grabbing" } },
+    groupRow: { paddingTop: 0, paddingBottom: 0 },
+    groupName: { minWidth: 0, minHeight: "34px" },
     groupToggle: {
         "width": "32px",
         "height": "32px",
         "flexShrink": 0,
+        "marginLeft": "-7.5px",
+        "marginRight": "-7.5px",
         "display": "grid",
         "placeItems": "center",
         "borderRadius": "6px",
-        "& svg": { width: "18px", height: "18px" },
+        "& svg": {
+            width: "14px",
+            height: "14px",
+            transitionProperty: "transform",
+            transitionDuration: "160ms",
+        },
+        '&[aria-expanded="true"] svg': { transform: "rotate(90deg)" },
+        "@media (prefers-reduced-motion: reduce)": {
+            "& svg": { transitionDuration: "0ms" },
+        },
         ":hover": { backgroundColor: "var(--neutralLight)" },
         ":focus-visible": { outline: "2px solid var(--primary)" },
     },
     exitDrop: {
+        position: "absolute",
+        left: "9px",
+        right: "9px",
+        bottom: "48px",
+        zIndex: 2,
+        boxSizing: "border-box",
+        backgroundColor: "var(--neutralLighterAlt)",
         display: "flex",
         alignItems: "center",
         gap: "8px",
         minHeight: "40px",
         padding: "4px 12px",
-        margin: "6px 0",
         border: "1px dashed var(--neutralTertiary)",
         borderRadius: "8px",
         color: "var(--neutralPrimary)",
@@ -350,7 +369,7 @@ export const Menu: React.FC = () => {
 
     return (
         <aside
-            className="modern-sidebar"
+            className={mergeClasses("modern-sidebar", classes.sidebar)}
             aria-label={intl.get("menu.subscriptions")}>
             <div className="modern-sidebar-heading">
                 <div className="modern-brand">
@@ -476,11 +495,13 @@ export const Menu: React.FC = () => {
                             <div
                                 className={mergeClasses(
                                     "modern-source-row modern-group-row",
+                                    classes.groupRow,
+                                    selected === group.key && "active",
                                     dropKey === group.key && classes.drop
                                 )}
                                 {...dropHandlers(group.key, {
                                     name: group.name,
-                                    sids: group.domain ? group.sids : [],
+                                    sids: group.sids,
                                 })}>
                                 <button
                                     type="button"
@@ -508,17 +529,14 @@ export const Menu: React.FC = () => {
                                                 return next
                                             })
                                     }}>
-                                    {expanded ? (
-                                        <ChevronDown16Regular />
-                                    ) : (
-                                        <ChevronRight16Regular />
-                                    )}
+                                    <ChevronRight16Filled />
                                 </button>
                                 <button
                                     type="button"
-                                    className={
-                                        selected === group.key ? "active" : ""
-                                    }
+                                    className={mergeClasses(
+                                        "modern-source-name",
+                                        classes.groupName
+                                    )}
                                     onClick={() => {
                                         dispatch(
                                             selectSources(

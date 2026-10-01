@@ -11,6 +11,7 @@ import {
 import { SourceCategory, SourceGroup } from "../../schema-types"
 import { ActionStatus, AppThunk, domParser } from "../utils"
 import { saveSettings } from "./app"
+import { mergeNamedGroups } from "../sidebar-groups"
 import {
     fetchItemsIntermediate,
     fetchItemsRequest,
@@ -202,6 +203,18 @@ function updateSourceGroupDone(group: SourceGroup): SourceGroupActionTypes {
 
 export function updateSourceGroup(group: SourceGroup): AppThunk {
     return (dispatch, getState) => {
+        const name = group.name.trim()
+        if (
+            !name ||
+            getState().groups.some(
+                (existing, index) =>
+                    index !== group.index &&
+                    existing.isMultiple &&
+                    existing.name.trim() === name
+            )
+        )
+            return
+        group = { ...group, name }
         dispatch(updateSourceGroupDone(group))
         window.settings.saveGroups(getState().groups)
     }
@@ -237,8 +250,9 @@ export function fixBrokenGroups(sources: SourceState): AppThunk {
     return (dispatch, getState) => {
         const { groups } = getState()
         const sids = new Set(Object.values(sources).map(s => s.sid))
-        let isBroken = false
-        const newGroups: SourceGroup[] = groups
+        const merged = mergeNamedGroups(groups)
+        let isBroken = merged !== groups
+        const newGroups: SourceGroup[] = merged
             .map(group => {
                 const newGroup: SourceGroup = {
                     ...group,
