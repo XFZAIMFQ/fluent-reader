@@ -31,6 +31,10 @@ ipcMain.handle("set-reader-preferences", (_, value: ReaderPreferences) => {
         startupFetch: Boolean(value.startupFetch),
         readingMode: value.readingMode === "inline" ? "inline" : "overlay",
         readBehavior: value.readBehavior === "manual" ? "manual" : "auto",
+        strategy: value.strategy === "publication" ? "publication" : "interval",
+        backgroundSiteLimit: Number.isFinite(value.backgroundSiteLimit)
+            ? Math.max(1, Math.min(1000, Math.floor(value.backgroundSiteLimit)))
+            : 4,
         frequency: Number.isFinite(value.frequency)
             ? Math.max(0, Math.min(525600, value.frequency))
             : 60,

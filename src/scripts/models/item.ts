@@ -3,7 +3,7 @@ import lf from "lovefield"
 import intl from "react-intl-universal"
 import type { MyParserItem } from "../utils"
 import { resolveSubscriptionPolicy, feedWebsite } from "../subscription-policy"
-import { feedIsDue, runFeedQueue } from "../feed-scheduler"
+import { feedIsDue, runFeedQueue, planFeed } from "../feed-scheduler"
 import {
     domParser,
     htmlDecode,
@@ -202,6 +202,8 @@ interface FetchItemsAction {
     itemState?: ItemState
     errSource?: RSSSource
     err?
+    complete?: boolean
+    background?: boolean
 }
 
 interface MarkReadAction {
@@ -239,23 +241,29 @@ export type ItemActionTypes =
     | ToggleStarredAction
     | ToggleHiddenAction
 
-export function fetchItemsRequest(fetchCount = 0): ItemActionTypes {
+export function fetchItemsRequest(
+    fetchCount = 0,
+    background = false
+): ItemActionTypes {
     return {
         type: FETCH_ITEMS,
         status: ActionStatus.Request,
         fetchCount: fetchCount,
+        background,
     }
 }
 
 export function fetchItemsSuccess(
     items: RSSItem[],
-    itemState: ItemState
+    itemState: ItemState,
+    complete = true
 ): ItemActionTypes {
     return {
         type: FETCH_ITEMS,
         status: ActionStatus.Success,
         items: items,
         itemState: itemState,
+        complete,
     }
 }
 
@@ -300,6 +308,7 @@ export function fetchItems(
             !initState.app.syncing
         ) {
             fetchingCycle = true
+            let nextCheckAt = 0
             try {
                 if (
                     sids === null ||
@@ -314,40 +323,68 @@ export function fetchItems(
                     sids === null
                         ? Object.values(state.sources)
                         : [...new Set(sids)].map(sid => state.sources[sid])
-                const sources = candidates
+                const eligibleSources = candidates
                     .filter(source => {
-                        if (!source || source.serviceRef) return false
-                        const job = {
-                            url: source.url,
-                            site: feedWebsite(source),
-                            frequency: resolveSubscriptionPolicy(
-                                source,
-                                state.groups,
-                                state.page.readerPreferences
-                            ).frequency,
-                        }
-                        return feedIsDue(
-                            job,
-                            source.lastFetched?.getTime() || 0,
-                            schedule,
-                            !background
-                        )
+                        return source && !source.serviceRef
                     })
                     .sort(
                         (a, b) =>
                             (a.lastFetched?.getTime() || 0) -
                             (b.lastFetched?.getTime() || 0)
                     )
-                const jobs = sources.map(source => ({
+                const jobFor = (source: RSSSource) => ({
                     url: source.url,
                     site: feedWebsite(source),
-                    frequency: resolveSubscriptionPolicy(
+                    ...resolveSubscriptionPolicy(
                         source,
-                        state.groups,
-                        state.page.readerPreferences
-                    ).frequency,
-                }))
-                dispatch(fetchItemsRequest(jobs.length))
+                        getState().groups,
+                        getState().page.readerPreferences
+                    ),
+                })
+                for (const source of eligibleSources) {
+                    const job = jobFor(source)
+                    const record = (schedule.sources[job.url] ||= {})
+                    if (
+                        job.strategy === "publication" &&
+                        record.publishedAt === undefined
+                    ) {
+                        const dates = (await db.itemsDB
+                            .select(db.items.date, db.items.fetchedDate)
+                            .from(db.items)
+                            .where(
+                                lf.op.and(
+                                    db.items.source.eq(source.sid),
+                                    db.items.date.lte(new Date())
+                                )
+                            )
+                            .orderBy(db.items.date, lf.Order.DESC)
+                            .limit(100)
+                            .exec()) as Pick<RSSItem, "date" | "fetchedDate">[]
+                        // Old entries without a feed date used the fetch time as a fallback.
+                        record.publishedAt =
+                            dates
+                                .find(
+                                    item =>
+                                        Math.abs(
+                                            item.date.getTime() -
+                                                item.fetchedDate.getTime()
+                                        ) > 1000
+                                )
+                                ?.date.getTime() || 0
+                    }
+                    planFeed(job, source.lastFetched?.getTime() || 0, schedule)
+                }
+                await window.settings.setFeedSchedule(schedule)
+                const sources = eligibleSources.filter(source =>
+                    feedIsDue(
+                        jobFor(source),
+                        source.lastFetched?.getTime() || 0,
+                        schedule,
+                        !background
+                    )
+                )
+                const jobs = sources.map(jobFor)
+                dispatch(fetchItemsRequest(jobs.length, background))
                 const results = await runFeedQueue(
                     jobs,
                     schedule,
@@ -357,17 +394,36 @@ export function fetchItems(
                             source => source.url === job.url
                         )
                         if (!source) return []
-                        const { items, metadata } = await RSSSource.fetchItems(
-                            source
-                        )
+                        const { items, metadata, publishedAt } =
+                            await RSSSource.fetchItems(source)
                         const latest = getState().sources[source.sid]
+                        if (latest?.url !== source.url) return []
+                        const inserted = await insertItems(items)
+                        const currentSource = getState().sources[source.sid]
+                        if (currentSource?.url !== source.url) {
+                            if (inserted.length)
+                                await db.itemsDB
+                                    .delete()
+                                    .from(db.items)
+                                    .where(
+                                        db.items._id.in(
+                                            inserted.map(item => item._id)
+                                        )
+                                    )
+                                    .exec()
+                            return []
+                        }
+                        schedule.sources[job.url].publishedAt = Math.max(
+                            schedule.sources[job.url].publishedAt || 0,
+                            publishedAt
+                        )
                         if (latest)
                             await dispatch(
                                 updateSource({
-                                    ...latest,
+                                    ...currentSource,
                                     ...metadata,
                                     metadataVersion: 1,
-                                    ...(latest.iconOrigin !== "manual" &&
+                                    ...(currentSource.iconOrigin !== "manual" &&
                                     metadata.feedIcon
                                         ? {
                                               iconurl: metadata.feedIcon,
@@ -377,59 +433,73 @@ export function fetchItems(
                                     lastFetched: new Date(),
                                 })
                             )
-                        return latest ? items : []
+                        dispatch(
+                            fetchItemsSuccess(
+                                inserted.reverse(),
+                                getState().items,
+                                false
+                            )
+                        )
+                        if (background) {
+                            for (const item of inserted)
+                                if (item.notify)
+                                    dispatch(pushNotification(item))
+                            if (inserted.length) window.utils.requestAttention()
+                        }
+                        return inserted
                     },
                     value => window.settings.setFeedSchedule(value),
-                    () => dispatch(fetchItemsIntermediate())
+                    () => dispatch(fetchItemsIntermediate()),
+                    undefined,
+                    {
+                        background,
+                        siteLimit:
+                            state.page.readerPreferences.backgroundSiteLimit,
+                        stopped: () =>
+                            getState().app.settings.display ||
+                            getState().app.settings.saving ||
+                            getState().app.syncing,
+                        interval: () =>
+                            getState().page.readerPreferences.siteInterval,
+                        resolve: job => {
+                            const source = Object.values(
+                                getState().sources
+                            ).find(source => source.url === job.url)
+                            if (!source) return undefined
+                            const current = jobFor(source)
+                            planFeed(
+                                current,
+                                source.lastFetched?.getTime() || 0,
+                                schedule
+                            )
+                            return feedIsDue(
+                                current,
+                                source.lastFetched?.getTime() || 0,
+                                schedule,
+                                !background
+                            )
+                                ? current
+                                : undefined
+                        },
+                        deferred: at => {
+                            nextCheckAt = nextCheckAt
+                                ? Math.min(nextCheckAt, at)
+                                : at
+                        },
+                    }
                 )
-                return await new Promise<void>((resolve, reject) => {
-                    let items = new Array<RSSItem>()
-                    results.map((r, i) => {
-                        if (r.status === "fulfilled")
-                            items.push(...(r.value || []))
-                        else {
-                            console.log(r.reason)
-                            dispatch(fetchItemsFailure(sources[i], r.reason))
-                        }
-                    })
-                    insertItems(items)
-                        .then(inserted => {
-                            dispatch(
-                                fetchItemsSuccess(
-                                    inserted.reverse(),
-                                    getState().items
-                                )
-                            )
-                            resolve()
-                            if (background) {
-                                for (let item of inserted) {
-                                    if (item.notify) {
-                                        dispatch(pushNotification(item))
-                                    }
-                                }
-                                if (inserted.length > 0) {
-                                    window.utils.requestAttention()
-                                }
-                            } else {
-                                dispatch(dismissItems())
-                            }
-                        })
-                        .catch(err => {
-                            dispatch(fetchItemsSuccess([], getState().items))
-                            window.utils.showErrorBox(
-                                "A database error has occurred.",
-                                String(err)
-                            )
-                            console.log(err)
-                            reject(err)
-                        })
+                results.forEach((result, i) => {
+                    if (result.status === "rejected")
+                        dispatch(fetchItemsFailure(sources[i], result.reason))
                 })
+                dispatch(fetchItemsSuccess([], getState().items))
+                if (!background) dispatch(dismissItems())
             } catch (error) {
                 dispatch(fetchItemsSuccess([], getState().items))
                 throw error
             } finally {
                 fetchingCycle = false
-                dispatch(setupAutoFetch())
+                dispatch(setupAutoFetch(background ? nextCheckAt : undefined))
             }
         }
     }

@@ -27,6 +27,7 @@ import {
 } from "../../schema-types"
 import { sourceMetadata, httpUrl } from "../source-metadata"
 import { validateFavicon } from "../utils"
+import { latestPublicationDate } from "../feed-scheduler"
 
 export const enum SourceOpenTarget {
     Local,
@@ -136,6 +137,7 @@ export class RSSSource {
         return {
             items: await this.checkItems(source, feed.items),
             metadata: sourceMetadata(source.url, feed),
+            publishedAt: latestPublicationDate(feed.items),
         }
     }
 }

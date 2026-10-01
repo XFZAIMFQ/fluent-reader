@@ -74,6 +74,39 @@ export const SubscriptionPolicyFields: React.FC<{
             </label>
             {!hideFrequency && (
                 <>
+                    <label className={classes.label} htmlFor={`${id}-strategy`}>
+                        {intl.get("policy.strategy")}
+                        <select
+                            id={`${id}-strategy`}
+                            className={classes.input}
+                            value={value.strategy || "inherit"}
+                            onChange={event =>
+                                onChange({
+                                    ...value,
+                                    strategy:
+                                        event.target.value === "inherit"
+                                            ? undefined
+                                            : (event.target.value as
+                                                  | "interval"
+                                                  | "publication"),
+                                })
+                            }>
+                            {inherited && (
+                                <option value="inherit">
+                                    {intl.get("policy.inherit")}
+                                </option>
+                            )}
+                            <option value="interval">
+                                {intl.get("policy.intervalStrategy")}
+                            </option>
+                            <option value="publication">
+                                {intl.get("policy.publicationStrategy")}
+                            </option>
+                        </select>
+                    </label>
+                    <p className={classes.hint}>
+                        {intl.get("policy.strategyHint")}
+                    </p>
                     <label
                         className={classes.label}
                         htmlFor={`${id}-frequency`}>

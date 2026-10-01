@@ -12,6 +12,19 @@ import ServiceTabContainer from "../containers/settings/service-container"
 import { initTouchBarWithTexts } from "../scripts/utils"
 import { useAppSelector, useAppDispatch } from "../scripts/reducer"
 import { exitSettings } from "../scripts/models/app"
+import { makeStyles } from "@griffel/react"
+
+const useStyles = makeStyles({
+    updateStatus: {
+        margin: "0 30px 8px",
+        padding: "10px 12px",
+        backgroundColor: "var(--neutralLighterAlt)",
+        color: "var(--neutralSecondary)",
+        borderRadius: "8px",
+        fontSize: "12px",
+        flexShrink: 0,
+    },
+})
 
 type SettingsTab =
     | "app"
@@ -32,15 +45,16 @@ const tabs: { key: SettingsTab; icon: string }[] = [
 
 const Settings: React.FC = () => {
     const dispatch = useAppDispatch()
+    const classes = useStyles()
     const display = useAppSelector(s => s.app.settings.display)
     const selectedSids = useAppSelector(s => s.app.settings.sids)
     const blocked = useAppSelector(
-        s =>
-            !s.app.sourceInit ||
-            s.app.syncing ||
-            s.app.fetchingItems ||
-            s.app.settings.saving
+        s => !s.app.sourceInit || s.app.syncing || s.app.settings.saving
     )
+    const fetching = useAppSelector(s => s.app.fetchingItems)
+    const background = useAppSelector(s => s.app.backgroundFetching)
+    const progress = useAppSelector(s => s.app.fetchingProgress)
+    const total = useAppSelector(s => s.app.fetchingTotal)
     const exiting = useAppSelector(s => s.app.settings.saving)
     const [active, setActive] = useState<SettingsTab>("app")
     const exitingRef = useRef(exiting)
@@ -154,6 +168,16 @@ const Settings: React.FC = () => {
                             <Icon iconName="Cancel" />
                         </button>
                     </header>
+                    {fetching && (
+                        <p className={classes.updateStatus} role="status">
+                            {intl.get(
+                                background
+                                    ? "policy.backgroundWorking"
+                                    : "policy.manualWorking",
+                                { done: progress, total }
+                            )}
+                        </p>
+                    )}
                     <div className="modern-settings-scroll" key={active}>
                         {content[active]}
                     </div>

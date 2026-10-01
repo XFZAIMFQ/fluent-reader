@@ -346,6 +346,15 @@
         "next": "Next item",
         "effective": "Current rules: {frequency}; {read}",
         "cooldown": "Requests paused until {time}",
-        "pollHint": "While the app is open, check at this interval and update only due sources. Disabled stops these checks; startup updates have their own switch. Manual refresh skips the update period but still respects website spacing and cooldown."
+        "pollHint": "Check at this interval while the app is open and update only due sources. Disabled stops regular scans; a started startup queue still continues within its website allowance. Manual refresh skips periods and the background allowance, while respecting spacing and cooldown.",
+        "manualWorking": "Updating {done}/{total}. You can continue using settings while the manual queue runs.",
+        "publicationStrategy": "Align to publication time",
+        "intervalStrategy": "Fixed interval with staggering",
+        "backgroundWorking": "Updating {done}/{total}. Settings remain available; automatic tasks that have not started are paused and checked again after settings close.",
+        "backgroundLimitHint": "Checks are spaced evenly and the hourly allowance survives restart. Four means about one check every 15 minutes. Manual refresh bypasses this allowance while respecting request spacing and cooldown.",
+        "strategyHint": "Use the latest valid publication date and roll expired dates into the next period. Future previews and missing dates fall back to fixed intervals. Each feed keeps its offset; staggering adds up to one extra period.",
+        "backgroundLimit": "Background checks per website per hour",
+        "strategy": "Update strategy",
+        "nextCheck": "Earliest planned background check: {time}"
     }
 }

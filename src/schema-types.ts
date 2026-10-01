@@ -42,9 +42,11 @@ export interface MediaLayout {
 }
 
 export type ReadBehavior = "auto" | "manual"
+export type UpdateStrategy = "interval" | "publication"
 export interface SubscriptionPolicy {
     readBehavior?: ReadBehavior
     frequency?: number // minutes; absent means inherit, zero means manual only
+    strategy?: UpdateStrategy
 }
 export interface ReaderPreferences {
     startupFetch: boolean
@@ -52,6 +54,8 @@ export interface ReaderPreferences {
     readingMode: "overlay" | "inline"
     frequency: number
     siteInterval: number // seconds between requests to the same website
+    strategy: UpdateStrategy
+    backgroundSiteLimit: number // requests per website per rolling hour
     domainPolicies: Record<string, SubscriptionPolicy>
 }
 export const defaultReaderPreferences: ReaderPreferences = {
@@ -60,6 +64,8 @@ export const defaultReaderPreferences: ReaderPreferences = {
     readingMode: "overlay",
     frequency: 60,
     siteInterval: 10,
+    strategy: "interval",
+    backgroundSiteLimit: 4,
     domainPolicies: {},
 }
 export interface FeedScheduleState {
@@ -71,11 +77,21 @@ export interface FeedScheduleState {
             retryAt?: number
             failures?: number
             lastAttempt?: number
+            publishedAt?: number
+            strategy?: UpdateStrategy
+            spread?: number
+            planVersion?: number
         }
     >
     sites: Record<
         string,
-        { nextAllowed?: number; retryAt?: number; failures?: number }
+        {
+            nextAllowed?: number
+            retryAt?: number
+            failures?: number
+            attempts?: number[]
+            backgroundNextAllowed?: number
+        }
     >
 }
 

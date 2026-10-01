@@ -36,6 +36,10 @@ export function resolveSubscriptionPolicy(
         ? preferences.domainPolicies[domain]
         : undefined
     return {
+        strategy:
+            source.policy?.strategy ??
+            inherited?.strategy ??
+            preferences.strategy,
         readBehavior:
             source.policy?.readBehavior ??
             inherited?.readBehavior ??

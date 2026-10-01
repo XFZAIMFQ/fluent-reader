@@ -69,6 +69,36 @@ export default function ReaderPreferenceSettings() {
             </div>
             <div className="modern-setting-row">
                 <div className="modern-setting-copy">
+                    <strong>{intl.get("policy.backgroundLimit")}</strong>
+                    <p>{intl.get("policy.backgroundLimitHint")}</p>
+                </div>
+                <SpinButton
+                    ariaLabel={intl.get("policy.backgroundLimit")}
+                    value={String(value.backgroundSiteLimit)}
+                    min={1}
+                    max={1000}
+                    onValidate={text => {
+                        const n = Number(text)
+                        if (Number.isInteger(n) && n >= 1 && n <= 1000) {
+                            void change({ backgroundSiteLimit: n })
+                            return String(n)
+                        }
+                        return String(value.backgroundSiteLimit)
+                    }}
+                    onIncrement={() => {
+                        const n = Math.min(1000, value.backgroundSiteLimit + 1)
+                        void change({ backgroundSiteLimit: n })
+                        return String(n)
+                    }}
+                    onDecrement={() => {
+                        const n = Math.max(1, value.backgroundSiteLimit - 1)
+                        void change({ backgroundSiteLimit: n })
+                        return String(n)
+                    }}
+                />
+            </div>
+            <div className="modern-setting-row">
+                <div className="modern-setting-copy">
                     <strong>{intl.get("policy.defaults")}</strong>
                     <p>{intl.get("policy.priorityHint")}</p>
                 </div>
@@ -78,11 +108,13 @@ export default function ReaderPreferenceSettings() {
                     value={{
                         readBehavior: value.readBehavior,
                         frequency: value.frequency,
+                        strategy: value.strategy,
                     }}
                     onChange={policy =>
                         void change({
                             readBehavior: policy.readBehavior,
                             frequency: policy.frequency,
+                            strategy: policy.strategy,
                         })
                     }
                 />

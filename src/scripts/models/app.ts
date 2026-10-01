@@ -88,6 +88,7 @@ export class AppState {
     feedInit = false
     syncing = false
     fetchingItems = false
+    backgroundFetching = false
     fetchingProgress = 0
     fetchingTotal = 0
     lastFetched = new Date()
@@ -362,6 +363,7 @@ export function exitSettings(): AppThunk<Promise<void>> {
             } else {
                 dispatch(toggleSettings(false))
             }
+            dispatch(setupAutoFetch())
         }
     }
 }
@@ -380,23 +382,35 @@ function freeMemory(): AppThunk {
 }
 
 let fetchTimeout: NodeJS.Timeout
-export function setupAutoFetch(): AppThunk {
+let deferredFetchAt = 0
+export function setupAutoFetch(nextCheckAt?: number): AppThunk {
     return (dispatch, getState) => {
         clearTimeout(fetchTimeout)
-        const setupTimeout = (interval?: number) => {
-            if (!interval) interval = window.settings.getFetchInterval()
-            if (interval) {
-                fetchTimeout = setTimeout(() => {
-                    let state = getState()
-                    if (!state.app.settings.display) {
-                        if (!state.app.fetchingItems) dispatch(fetchItems(true))
-                    } else {
-                        setupTimeout(1)
-                    }
-                }, interval * 60000)
+        if (nextCheckAt !== undefined) deferredFetchAt = nextCheckAt
+        const now = Date.now()
+        const interval = window.settings.getFetchInterval()
+        const target = Math.min(
+            deferredFetchAt || Infinity,
+            interval ? now + interval * 60000 : Infinity
+        )
+        if (!Number.isFinite(target)) return
+        const delay = Math.max(
+            getState().app.settings.display ? 60000 : 1000,
+            target - now
+        )
+        fetchTimeout = setTimeout(() => {
+            const state = getState()
+            if (
+                state.app.settings.display ||
+                state.app.fetchingItems ||
+                state.app.syncing
+            )
+                dispatch(setupAutoFetch())
+            else {
+                deferredFetchAt = 0
+                dispatch(fetchItems(true))
             }
-        }
-        setupTimeout()
+        }, Math.min(delay, 2147483647))
     }
 }
 
@@ -598,6 +612,7 @@ export function appReducer(
                         fetchingItems: true,
                         fetchingProgress: 0,
                         fetchingTotal: action.fetchCount,
+                        backgroundFetching: Boolean(action.background),
                     }
                 case ActionStatus.Failure:
                     return {
@@ -620,8 +635,16 @@ export function appReducer(
                 case ActionStatus.Success:
                     return {
                         ...state,
-                        fetchingItems: false,
-                        fetchingTotal: 0,
+                        fetchingItems:
+                            action.complete === false
+                                ? state.fetchingItems
+                                : false,
+                        fetchingTotal:
+                            action.complete === false ? state.fetchingTotal : 0,
+                        backgroundFetching:
+                            action.complete === false
+                                ? state.backgroundFetching
+                                : false,
                         logMenu:
                             action.items.length == 0
                                 ? state.logMenu

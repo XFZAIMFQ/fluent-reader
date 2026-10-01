@@ -5,6 +5,7 @@ import {
     resolveSubscriptionPolicy,
     feedWebsite,
 } from "../../scripts/subscription-policy"
+import { backgroundEligibleAt } from "../../scripts/feed-scheduler"
 import type { RSSSource } from "../../scripts/models/source"
 import { frequencyText } from "./subscription-policy-fields"
 
@@ -21,6 +22,20 @@ export default function EffectiveSourcePolicy({
         schedule.sources[source.url]?.retryAt || 0,
         schedule.sites[feedWebsite(source)]?.retryAt || 0
     )
+    const backgroundAt = backgroundEligibleAt(
+        schedule,
+        feedWebsite(source),
+        preferences.backgroundSiteLimit
+    )
+    const planned = schedule.sources[source.url]
+    const nextDue = Math.max(
+        planned?.strategy === policy.strategy &&
+            planned?.frequency === policy.frequency
+            ? planned.nextDue || 0
+            : 0,
+        retryAt,
+        backgroundAt
+    )
     return (
         <p role="status">
             {intl.get("policy.effective", {
@@ -31,6 +46,24 @@ export default function EffectiveSourcePolicy({
                         : "policy.autoRead"
                 ),
             })}
+            {!source.serviceRef && (
+                <>
+                    <br />
+                    {intl.get(
+                        policy.strategy === "publication"
+                            ? "policy.publicationStrategy"
+                            : "policy.intervalStrategy"
+                    )}
+                    {!!policy.frequency && nextDue > Date.now() && (
+                        <>
+                            <br />
+                            {intl.get("policy.nextCheck", {
+                                time: new Date(nextDue).toLocaleString(),
+                            })}
+                        </>
+                    )}
+                </>
+            )}
             {!source.serviceRef && retryAt > Date.now() && (
                 <>
                     <br />
