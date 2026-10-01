@@ -317,6 +317,16 @@
         "sourceOverride": "有個別規則",
         "deleteHint": "刪除群組並將其中訂閱來源移至「未分組」？訂閱來源和文章會保留。"
     },
+    "settingsControls": {
+        "increase": "增加{label}",
+        "decrease": "減少{label}"
+    },
+    "readerNavigation": {
+        "sourceEntries": "查看{name}的文章",
+        "loading": "正在讀取本機文章…",
+        "loadError": "本機文章讀取失敗。",
+        "retry": "重試"
+    },
     "policy": {
         "readBehavior": "開啟內容後的已讀行為",
         "inherit": "跟隨群組／全域預設",

@@ -19,6 +19,12 @@ import { ContextMenuType } from "../scripts/models/app"
 import { makeStyles, mergeClasses } from "@fluentui/react-components"
 import { FlatButton } from "./utils/FlatButton"
 import { FlatButtonGroup } from "./utils/FlatButtonGroup"
+import { SourceEntriesMenu } from "./utils/source-entries-menu"
+import {
+    Dismiss16Regular,
+    ArrowLeft16Regular,
+    ArrowRight16Regular,
+} from "@fluentui/react-icons"
 
 const usePageClasses = makeStyles({
     hidden: { display: "none" },
@@ -46,6 +52,14 @@ const usePageClasses = makeStyles({
         overflow: "hidden",
         textOverflow: "ellipsis",
         whiteSpace: "nowrap",
+    },
+    crumbButton: {
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        borderRadius: "6px",
+        cursor: "pointer",
+        flexShrink: 0,
     },
     categoryCrumb: { width: "auto", padding: "0 6px", flexShrink: 0 },
     sourceCrumb: {
@@ -315,12 +329,16 @@ const Page: React.FC = () => {
                             className={pageClasses.breadcrumb}
                             aria-label={intl.get("policy.breadcrumb")}>
                             <FlatButton
+                                styleClass={pageClasses.crumbButton}
                                 ariaLabel={intl.get("policy.backToList")}
                                 onClick={() => dispatch(dismissItem())}>
-                                <Icon iconName="ChromeClose" />
+                                <Dismiss16Regular />
                             </FlatButton>
                             <FlatButton
-                                styleClass={pageClasses.categoryCrumb}
+                                styleClass={mergeClasses(
+                                    pageClasses.crumbButton,
+                                    pageClasses.categoryCrumb
+                                )}
                                 onClick={() => dispatch(dismissItem())}>
                                 {intl.get(`contentView.${contentView}`)}
                             </FlatButton>
@@ -329,20 +347,30 @@ const Page: React.FC = () => {
                                 title={currentSource.name}
                                 styleClass={mergeClasses(
                                     pageClasses.crumb,
+                                    pageClasses.crumbButton,
                                     pageClasses.sourceCrumb
                                 )}
                                 onClick={() => {
-                                    dispatch(
-                                        selectSources(
-                                            [currentSource.sid],
-                                            `s-${currentSource.sid}`,
-                                            currentSource.name
+                                    dispatch(dismissItem())
+                                    if (menuKey !== `s-${currentSource.sid}`) {
+                                        dispatch(
+                                            selectSources(
+                                                [currentSource.sid],
+                                                `s-${currentSource.sid}`,
+                                                currentSource.name
+                                            )
                                         )
-                                    )
-                                    dispatch(initFeeds())
+                                        dispatch(initFeeds())
+                                    }
                                 }}>
                                 {currentSource.name}
                             </FlatButton>
+                            <SourceEntriesMenu
+                                key={currentSource.sid}
+                                currentItem={currentItem}
+                                sourceName={currentSource.name}
+                                feedId={feedId}
+                            />
                             <span>/</span>
                             <span
                                 className={pageClasses.crumb}
@@ -352,14 +380,16 @@ const Page: React.FC = () => {
                             {itemFromFeed && (
                                 <div className={pageClasses.navigation}>
                                     <FlatButton
+                                        styleClass={pageClasses.crumbButton}
                                         ariaLabel={intl.get("policy.previous")}
                                         onClick={prevItem}>
-                                        <Icon iconName="Back" />
+                                        <ArrowLeft16Regular />
                                     </FlatButton>
                                     <FlatButton
+                                        styleClass={pageClasses.crumbButton}
                                         ariaLabel={intl.get("policy.next")}
                                         onClick={nextItem}>
-                                        <Icon iconName="Forward" />
+                                        <ArrowRight16Regular />
                                     </FlatButton>
                                 </div>
                             )}

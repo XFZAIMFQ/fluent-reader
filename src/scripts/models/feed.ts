@@ -118,7 +118,11 @@ export class RSSFeed {
         this.filter = filter === null ? new FeedFilter() : filter
     }
 
-    static async loadFeed(feed: RSSFeed, skip = 0): Promise<RSSItem[]> {
+    static async loadFeed(
+        feed: RSSFeed,
+        skip = 0,
+        quantity = LOAD_QUANTITY
+    ): Promise<RSSItem[]> {
         const predicates = FeedFilter.toPredicates(feed.filter)
         predicates.push(db.items.source.in(feed.sids))
         return (await db.itemsDB
@@ -127,7 +131,7 @@ export class RSSFeed {
             .where(lf.op.and.apply(null, predicates))
             .orderBy(db.items.date, lf.Order.DESC)
             .skip(skip)
-            .limit(LOAD_QUANTITY)
+            .limit(quantity)
             .exec()) as RSSItem[]
     }
 }

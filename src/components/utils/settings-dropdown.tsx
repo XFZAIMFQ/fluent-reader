@@ -1,6 +1,7 @@
 import * as React from "react"
 import { Dropdown, IDropdownProps } from "@fluentui/react"
 import { makeStyles, mergeClasses } from "@griffel/react"
+import { ChevronDown16Regular } from "@fluentui/react-icons"
 
 const useStyles = makeStyles({
     root: {
@@ -14,22 +15,34 @@ const useStyles = makeStyles({
             borderRadius: "6px",
             padding: "0 36px 0 12px",
         },
-        "& .ms-Dropdown-chevronDownWrapper": {
-            height: "34px",
-            lineHeight: "34px",
+        "& .ms-Dropdown-caretDownWrapper": {
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            top: "1px",
+            bottom: "1px",
+            height: "auto",
+            lineHeight: "normal",
             width: "32px",
             right: "4px",
+            color: "var(--neutralSecondary)",
+        },
+        "& .ms-Dropdown[aria-disabled='true'] .ms-Dropdown-caretDownWrapper": {
+            color: "var(--neutralTertiary)",
         },
     },
 })
 
 export const SettingsDropdown: React.FC<
     IDropdownProps & { styleClass?: string }
-> = ({ styleClass, className, ...props }) => {
+> = ({ styleClass, className, onRenderCaretDown, ...props }) => {
     const classes = useStyles()
     return (
         <Dropdown
             {...props}
+            onRenderCaretDown={
+                onRenderCaretDown || (() => <ChevronDown16Regular />)
+            }
             className={mergeClasses(classes.root, className, styleClass)}
         />
     )

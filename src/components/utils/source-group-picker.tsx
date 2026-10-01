@@ -2,6 +2,7 @@ import * as React from "react"
 import intl from "react-intl-universal"
 import { Combobox, Option } from "@fluentui/react-components"
 import { makeStyles } from "@griffel/react"
+import { ChevronDown16Regular } from "@fluentui/react-icons"
 import { SourceGrouping } from "../../scripts/models/group"
 import { useAppSelector } from "../../scripts/reducer"
 
@@ -12,7 +13,10 @@ const useStyles = makeStyles({
         "boxSizing": "border-box",
         "backgroundColor": "var(--white)",
         "color": "var(--neutralPrimary)",
-        "& input": { color: "inherit" },
+        "minHeight": "36px",
+        "borderRadius": "6px",
+        "& input": { color: "inherit", paddingLeft: "12px" },
+        "& .fui-Combobox__expandIcon": { color: "var(--neutralSecondary)" },
     },
     hint: {
         fontSize: "12px",
@@ -45,6 +49,7 @@ export const SourceGroupPicker: React.FC<{
                 aria-label={intl.get("groups.group")}
                 disabled={disabled}
                 freeform
+                expandIcon={<ChevronDown16Regular />}
                 value={text}
                 selectedOptions={[
                     value.mode === "manual"

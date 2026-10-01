@@ -26,6 +26,7 @@ import { SourceRule, RuleActions } from "../../scripts/models/rule"
 import { FilterType } from "../../scripts/models/feed"
 import { MyParserItem, validateRegex } from "../../scripts/utils"
 import { RSSItem } from "../../scripts/models/item"
+import { AddCircle16Regular } from "@fluentui/react-icons"
 
 const actionKeyMap = {
     "r-true": "article.markRead",
@@ -445,7 +446,7 @@ class RulesTab extends React.Component<RulesTabProps, RulesTabState> {
                                     selectedKeys={this.state.actionKeys}
                                     onChange={this.onActionOptionChange}
                                     onRenderCaretDown={() => (
-                                        <Icon iconName="CirclePlus" />
+                                        <AddCircle16Regular />
                                     )}
                                 />
                             </Stack.Item>

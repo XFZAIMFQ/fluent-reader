@@ -91,7 +91,8 @@ const useStyles = makeStyles({
 
 export type FlatButtonVariant = "default" | "system" | "close"
 
-export interface FlatButtonProps {
+export interface FlatButtonProps
+    extends React.ButtonHTMLAttributes<HTMLButtonElement> {
     children: React.ReactNode
     title?: string
     ariaLabel?: string
@@ -104,37 +105,47 @@ export interface FlatButtonProps {
     styleClass?: string
 }
 
-export const FlatButton: React.FC<FlatButtonProps> = ({
-    children,
-    title,
-    ariaLabel,
-    id,
-    onClick,
-    onMouseDown,
-    disabled,
-    fetching,
-    variant = "default",
-    styleClass,
-}) => {
-    const classes = useStyles()
+export const FlatButton = React.forwardRef<HTMLButtonElement, FlatButtonProps>(
+    (
+        {
+            children,
+            title,
+            ariaLabel,
+            id,
+            onClick,
+            onMouseDown,
+            disabled,
+            fetching,
+            variant = "default",
+            styleClass,
+            className,
+            ...buttonProps
+        },
+        ref
+    ) => {
+        const classes = useStyles()
 
-    return (
-        <button
-            type="button"
-            className={mergeClasses(
-                classes.root,
-                variant === "close" && classes.close,
-                disabled && classes.disabled,
-                fetching && classes.fetching,
-                styleClass
-            )}
-            title={title}
-            aria-label={ariaLabel || title}
-            id={id}
-            onClick={disabled ? undefined : onClick}
-            onMouseDown={disabled ? undefined : onMouseDown}
-            disabled={disabled}>
-            {children}
-        </button>
-    )
-}
+        return (
+            <button
+                {...buttonProps}
+                ref={ref}
+                type="button"
+                className={mergeClasses(
+                    classes.root,
+                    variant === "close" && classes.close,
+                    disabled && classes.disabled,
+                    fetching && classes.fetching,
+                    className,
+                    styleClass
+                )}
+                title={title}
+                aria-label={ariaLabel || title}
+                id={id}
+                onClick={disabled ? undefined : onClick}
+                onMouseDown={disabled ? undefined : onMouseDown}
+                disabled={disabled}>
+                {children}
+            </button>
+        )
+    }
+)

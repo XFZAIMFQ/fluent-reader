@@ -12,7 +12,14 @@ import {
     platformCtrl,
 } from "../utils"
 import { RSSSource, updateSource, updateUnreadCounts } from "./source"
-import { FeedActionTypes, INIT_FEED, LOAD_MORE, dismissItems } from "./feed"
+import {
+    FeedActionTypes,
+    INIT_FEED,
+    LOAD_MORE,
+    dismissItems,
+    FeedFilter,
+    RSSFeed,
+} from "./feed"
 import {
     pushNotification,
     setupAutoFetch,
@@ -188,6 +195,7 @@ export type ItemState = {
 }
 
 export const FETCH_ITEMS = "FETCH_ITEMS"
+const CACHE_ITEMS = "CACHE_ITEMS"
 export const MARK_READ = "MARK_READ"
 export const MARK_ALL_READ = "MARK_ALL_READ"
 export const MARK_UNREAD = "MARK_UNREAD"
@@ -234,12 +242,42 @@ interface ToggleHiddenAction {
 }
 
 export type ItemActionTypes =
+    | { type: typeof CACHE_ITEMS; items: RSSItem[] }
     | FetchItemsAction
     | MarkReadAction
     | MarkAllReadAction
     | MarkUnreadAction
     | ToggleStarredAction
     | ToggleHiddenAction
+
+// Reading navigation loads cached rows without starting a subscription update.
+export function loadCachedSourceEntries(
+    sid: number,
+    filter: FeedFilter,
+    skip = 0,
+    quantity = 50
+): AppThunk<Promise<RSSItem[]>> {
+    return async (dispatch, getState) => {
+        const available = () => {
+            const state = getState()
+            const source = state.sources[sid]
+            return (
+                source &&
+                !source.hidden &&
+                (!state.app.privacyMode || !source.private)
+            )
+        }
+        if (!available()) return []
+        const items = await RSSFeed.loadFeed(
+            new RSSFeed(null, [sid], filter),
+            skip,
+            quantity
+        )
+        if (!available()) return []
+        dispatch({ type: CACHE_ITEMS, items })
+        return items
+    }
+}
 
 export function fetchItemsRequest(
     fetchCount = 0,
@@ -712,6 +750,13 @@ export function itemReducer(
         | SettingsActionTypes
 ): ItemState {
     switch (action.type) {
+        case CACHE_ITEMS:
+            return {
+                ...Object.fromEntries(
+                    action.items.map(item => [item._id, item])
+                ),
+                ...state,
+            }
         case FETCH_ITEMS:
             switch (action.status) {
                 case ActionStatus.Success: {

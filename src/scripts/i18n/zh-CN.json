@@ -340,6 +340,16 @@
         "sourceOverride": "有单独规则",
         "deleteHint": "删除分组并将其中订阅源移至“未分组”？订阅源和文章会保留。"
     },
+    "settingsControls": {
+        "increase": "增加{label}",
+        "decrease": "减少{label}"
+    },
+    "readerNavigation": {
+        "sourceEntries": "查看{name}的文章",
+        "loading": "正在读取本地文章…",
+        "loadError": "本地文章读取失败。",
+        "retry": "重试"
+    },
     "policy": {
         "readBehavior": "打开内容后的已读行为",
         "inherit": "跟随分组／全局默认",

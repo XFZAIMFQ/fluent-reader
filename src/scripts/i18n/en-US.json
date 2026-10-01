@@ -342,6 +342,16 @@
         "sourceOverride": "Has subscription rules",
         "deleteHint": "Delete this group and move its subscriptions to Ungrouped? Subscriptions and articles will be kept."
     },
+    "settingsControls": {
+        "increase": "Increase {label}",
+        "decrease": "Decrease {label}"
+    },
+    "readerNavigation": {
+        "sourceEntries": "Show articles from {name}",
+        "loading": "Reading cached articles…",
+        "loadError": "Could not read cached articles.",
+        "retry": "Retry"
+    },
     "policy": {
         "readBehavior": "Read status on opening",
         "inherit": "Follow group / default",
