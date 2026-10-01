@@ -7,9 +7,14 @@ import {
     DELETE_SOURCE,
     initSources,
     SourceOpenTarget,
-    updateFavicon,
 } from "./source"
-import { RSSItem, ItemActionTypes, FETCH_ITEMS, fetchItems } from "./item"
+import {
+    RSSItem,
+    ItemActionTypes,
+    FETCH_ITEMS,
+    fetchItems,
+    markReadOnOpen,
+} from "./item"
 import {
     ActionStatus,
     AppThunk,
@@ -413,6 +418,7 @@ export function pushNotification(item: RSSItem): AppThunk {
                     state.sources[item.source].openTarget ===
                     SourceOpenTarget.External
                 ) {
+                    dispatch(markReadOnOpen(item))
                     window.utils.openExternal(item.link)
                 } else if (!state.app.settings.display) {
                     window.utils.focus()
@@ -468,10 +474,9 @@ export function initApp(): AppThunk {
             .then(() => dispatch(initFeeds()))
             .then(async () => {
                 dispatch(selectAllArticles())
-                await dispatch(fetchItems())
-            })
-            .then(() => {
-                dispatch(updateFavicon())
+                if (window.settings.getReaderPreferences().startupFetch)
+                    await dispatch(fetchItems(true))
+                else dispatch(setupAutoFetch())
             })
     }
 }

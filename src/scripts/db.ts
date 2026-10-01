@@ -5,7 +5,7 @@ import { RSSSource } from "./models/source"
 import { RSSItem } from "./models/item"
 import { SourceCategory } from "../schema-types"
 
-const sdbSchema = lf.schema.create("sourcesDB", 6)
+const sdbSchema = lf.schema.create("sourcesDB", 7)
 sdbSchema
     .createTable("sources")
     .addColumn("sid", lf.Type.INTEGER)
@@ -27,6 +27,7 @@ sdbSchema
     .addColumn("iconOrigin", lf.Type.STRING)
     .addColumn("autoGroup", lf.Type.BOOLEAN)
     .addColumn("metadataVersion", lf.Type.INTEGER)
+    .addColumn("policy", lf.Type.OBJECT)
     .addNullable([
         "iconurl",
         "serviceRef",
@@ -34,6 +35,7 @@ sdbSchema
         "siteUrl",
         "feedIcon",
         "iconOrigin",
+        "policy",
     ])
     .addIndex("idxURL", ["url"], true)
 
@@ -91,6 +93,7 @@ async function onUpgradeSourceDB(rawDb: lf.raw.BackStore) {
         await rawDb.addTableColumn("sources", "autoGroup", true)
         await rawDb.addTableColumn("sources", "metadataVersion", 0)
     }
+    if (version < 7) await rawDb.addTableColumn("sources", "policy", null)
 }
 
 async function onUpgradeItemDB(rawDb: lf.raw.BackStore) {

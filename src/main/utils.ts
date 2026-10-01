@@ -9,6 +9,7 @@ type FeedResponse = {
     status: number
     statusText: string
     contentType: string
+    retryAfter: string
     body: ArrayBuffer
 }
 
@@ -85,6 +86,7 @@ function fetchFeed(url: string): Promise<FeedResponse> {
                     status: response.statusCode,
                     statusText: response.statusMessage,
                     contentType: header(response.headers["content-type"]),
+                    retryAfter: header(response.headers["retry-after"]),
                     body: bytes.buffer.slice(
                         bytes.byteOffset,
                         bytes.byteOffset + bytes.byteLength

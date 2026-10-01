@@ -25,6 +25,7 @@ import {
 import { RadioGroup, Radio } from "@fluentui/react-components"
 import DangerButton from "../utils/danger-button"
 import LocalApiSettings from "./local-api"
+import ReaderPreferenceSettings from "./reader-preferences"
 
 type AppTabProps = {
     privacyMode: boolean
@@ -215,9 +216,11 @@ class AppTab extends React.Component<AppTabProps, AppTabState> {
             <h2 className="modern-settings-section-title">
                 {intl.get("app.subscriptionSection")}
             </h2>
+            <ReaderPreferenceSettings />
             <div className="modern-setting-row">
                 <div className="modern-setting-copy">
                     <strong>{intl.get("app.fetchInterval")}</strong>
+                    <p>{intl.get("policy.pollHint")}</p>
                 </div>
                 <Dropdown
                     defaultSelectedKey={window.settings.getFetchInterval()}

@@ -75,12 +75,23 @@ export async function decodeFetchResponse(response: Response, isHTML = false) {
     return content
 }
 
+export class FeedFetchError extends Error {
+    constructor(
+        message: string,
+        public status = 0,
+        public retryAt = 0,
+        public challenge = false
+    ) {
+        super(message)
+    }
+}
+
 export async function parseRSS(url: string) {
     let result: Awaited<ReturnType<typeof window.utils.fetchFeed>>
     try {
         result = await window.utils.fetchFeed(url)
     } catch {
-        throw new Error(intl.get("log.networkError"))
+        throw new FeedFetchError(intl.get("log.networkError"))
     }
     if (result && result.status >= 200 && result.status < 300) {
         try {
@@ -91,10 +102,32 @@ export async function parseRSS(url: string) {
                 await decodeFetchResponse(response)
             )
         } catch {
-            throw new Error(intl.get("log.parseError"))
+            const text = new TextDecoder().decode(result.body.slice(0, 16384))
+            throw new FeedFetchError(
+                intl.get("log.parseError"),
+                result.status,
+                0,
+                /captcha|verify.{0,30}human|人机验证|cf-chl-|challenge-platform/i.test(
+                    text
+                )
+            )
         }
     } else {
-        throw new Error(result.status + " " + result.statusText)
+        const retryAfter = result.retryAfter?.trim()
+        const retryAt = retryAfter
+            ? /^\d+$/.test(retryAfter)
+                ? Date.now() + Number(retryAfter) * 1000
+                : Date.parse(retryAfter) || 0
+            : 0
+        const text = new TextDecoder().decode(result.body.slice(0, 16384))
+        throw new FeedFetchError(
+            result.status + " " + result.statusText,
+            result.status,
+            retryAt,
+            /captcha|verify.{0,30}human|人机验证|cf-chl-|challenge-platform/i.test(
+                text
+            )
+        )
     }
 }
 

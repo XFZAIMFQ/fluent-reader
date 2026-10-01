@@ -20,7 +20,11 @@ import {
 import { saveSettings } from "./app"
 import { SourceRule } from "./rule"
 import { fixBrokenGroups } from "./group"
-import { ContentView, SourceCategory } from "../../schema-types"
+import {
+    ContentView,
+    SourceCategory,
+    SubscriptionPolicy,
+} from "../../schema-types"
 import { sourceMetadata, httpUrl } from "../source-metadata"
 import { validateFavicon } from "../utils"
 
@@ -57,6 +61,7 @@ export class RSSSource {
     iconOrigin: string = ""
     autoGroup: boolean = true
     metadataVersion: number = 0
+    policy?: SubscriptionPolicy = {}
 
     constructor(url: string, name: string = null) {
         this.url = url
@@ -128,7 +133,10 @@ export class RSSSource {
 
     static async fetchItems(source: RSSSource) {
         let feed = await parseRSS(source.url)
-        return await this.checkItems(source, feed.items)
+        return {
+            items: await this.checkItems(source, feed.items),
+            metadata: sourceMetadata(source.url, feed),
+        }
     }
 }
 

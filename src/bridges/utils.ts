@@ -50,6 +50,7 @@ const utilsBridge = {
             status: number
             statusText: string
             contentType: string
+            retryAfter: string
             body: ArrayBuffer
         }
     },

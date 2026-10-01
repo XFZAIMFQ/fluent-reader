@@ -1,6 +1,10 @@
 import * as React from "react"
 import { useCallback } from "react"
-import { RSSItem, markRead, itemShortcuts } from "../../scripts/models/item"
+import {
+    RSSItem,
+    markReadOnOpen,
+    itemShortcuts,
+} from "../../scripts/models/item"
 import { openItemMenu } from "../../scripts/models/app"
 import { RSSFeed, FeedFilter, loadMore } from "../../scripts/models/feed"
 import { showItem } from "../../scripts/models/page"
@@ -55,7 +59,7 @@ export const Feed: React.FC<FeedOwnProps> = ({ feedId, viewType }) => {
         []
     )
     const handleMarkRead = useCallback(
-        (item: RSSItem) => dispatch(markRead(item)),
+        (item: RSSItem) => dispatch(markReadOnOpen(item)),
         []
     )
     const handleContextMenu = useCallback(

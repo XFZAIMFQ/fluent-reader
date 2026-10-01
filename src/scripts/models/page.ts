@@ -10,7 +10,7 @@ import {
 } from "./feed"
 import intl from "react-intl-universal"
 import { getWindowBreakpoint, AppThunk, ActionStatus } from "../utils"
-import { RSSItem, markRead } from "./item"
+import { RSSItem, markReadOnOpen } from "./item"
 import { SourceActionTypes, DELETE_SOURCE } from "./source"
 import { toggleMenu } from "./app"
 import { sidebarGroups } from "../sidebar-groups"
@@ -20,6 +20,7 @@ import {
     ContentView,
     SourceCategory,
     MediaLayout,
+    ReaderPreferences,
 } from "../../schema-types"
 
 export const SELECT_PAGE = "SELECT_PAGE"
@@ -33,6 +34,7 @@ export const TOGGLE_SEARCH = "TOGGLE_SEARCH"
 export const SWITCH_CONTENT_VIEW = "SWITCH_CONTENT_VIEW"
 const SET_COLLECTION = "SET_COLLECTION"
 const SET_MEDIA_LAYOUT = "SET_MEDIA_LAYOUT"
+const SET_READER_PREFERENCES = "SET_READER_PREFERENCES"
 
 export enum PageType {
     AllArticles,
@@ -85,6 +87,7 @@ interface ToggleSearchAction {
 }
 
 export type PageActionTypes =
+    | { type: typeof SET_READER_PREFERENCES; value: ReaderPreferences }
     | {
           type: typeof SET_MEDIA_LAYOUT
           view: SourceCategory
@@ -333,6 +336,7 @@ export function showItem(feedId: string, item: RSSItem): AppThunk {
             state.sources.hasOwnProperty(item.source) &&
             (!state.app.privacyMode || !state.sources[item.source].private)
         ) {
+            dispatch(markReadOnOpen(item))
             dispatch({
                 type: SHOW_ITEM,
                 feedId: feedId,
@@ -350,12 +354,36 @@ export function showItemFromId(iid: number): AppThunk {
             (state.app.privacyMode && state.sources[item.source]?.private)
         )
             return
-        if (!item.hasRead) dispatch(markRead(item))
         if (item) dispatch(showItem(null, item))
     }
 }
 
 export const dismissItem = (): PageActionTypes => ({ type: DISMISS_ITEM })
+
+let preferenceWrite = Promise.resolve()
+export function setReaderPreferences(
+    value: Partial<ReaderPreferences>
+): AppThunk<Promise<void>> {
+    return (dispatch, getState) => {
+        const write = preferenceWrite.then(async () => {
+            const latest = getState().page.readerPreferences
+            await window.settings.setReaderPreferences({
+                ...latest,
+                ...value,
+                domainPolicies: {
+                    ...latest.domainPolicies,
+                    ...value.domainPolicies,
+                },
+            })
+            dispatch({
+                type: SET_READER_PREFERENCES,
+                value: window.settings.getReaderPreferences(),
+            })
+        })
+        preferenceWrite = write.catch(() => {})
+        return write
+    }
+}
 
 export const toggleSearch = (): AppThunk => {
     return (dispatch, getState) => {
@@ -408,7 +436,6 @@ export function showOffsetItem(offset: number): AppThunk {
         if (newIndex >= 0) {
             if (newIndex < iids.length) {
                 let item = state.items[iids[newIndex]]
-                dispatch(markRead(item))
                 dispatch(showItem(feedId, item))
                 return
             } else if (!feed.allLoaded) {
@@ -479,6 +506,7 @@ export function performSearch(query: string): AppThunk {
 }
 
 export class PageState {
+    readerPreferences = globalThis.settings.getReaderPreferences()
     mediaLayouts = {
         [SourceCategory.Pictures]: globalThis.settings.getMediaLayout(
             SourceCategory.Pictures
@@ -506,6 +534,8 @@ export function pageReducer(
     action: PageActionTypes | SourceActionTypes | FeedActionTypes
 ): PageState {
     switch (action.type) {
+        case SET_READER_PREFERENCES:
+            return { ...state, readerPreferences: action.value }
         case SET_MEDIA_LAYOUT:
             return {
                 ...state,

@@ -2,6 +2,8 @@ import * as db from "../db"
 import lf from "lovefield"
 import intl from "react-intl-universal"
 import type { MyParserItem } from "../utils"
+import { resolveSubscriptionPolicy, feedWebsite } from "../subscription-policy"
+import { feedIsDue, runFeedQueue } from "../feed-scheduler"
 import {
     domParser,
     htmlDecode,
@@ -285,91 +287,150 @@ export async function insertItems(items: RSSItem[]): Promise<RSSItem[]> {
         .exec()) as RSSItem[]
 }
 
+let fetchingCycle = false
 export function fetchItems(
     background = false,
     sids: number[] = null
 ): AppThunk<Promise<void>> {
     return async (dispatch, getState) => {
-        let promises = new Array<Promise<RSSItem[]>>()
         const initState = getState()
-        if (!initState.app.fetchingItems && !initState.app.syncing) {
-            if (
-                sids === null ||
-                sids.filter(
-                    sid => initState.sources[sid].serviceRef !== undefined
-                ).length > 0
-            )
-                await dispatch(syncWithService(background))
-            let timenow = new Date().getTime()
-            const sourcesState = getState().sources
-            let sources =
-                sids === null
-                    ? Object.values(sourcesState).filter(s => {
-                          let last = s.lastFetched ? s.lastFetched.getTime() : 0
-                          return (
-                              !s.serviceRef &&
-                              (last > timenow ||
-                                  last + (s.fetchFrequency || 0) * 60000 <=
-                                      timenow)
-                          )
-                      })
-                    : sids
-                          .map(sid => sourcesState[sid])
-                          .filter(s => !s.serviceRef)
-            for (let source of sources) {
-                let promise = RSSSource.fetchItems(source)
-                promise.then(() =>
-                    dispatch(
-                        updateSource({ ...source, lastFetched: new Date() })
-                    )
+        if (
+            !fetchingCycle &&
+            !initState.app.fetchingItems &&
+            !initState.app.syncing
+        ) {
+            fetchingCycle = true
+            try {
+                if (
+                    sids === null ||
+                    sids.filter(sid =>
+                        Boolean(initState.sources[sid]?.serviceRef)
+                    ).length > 0
                 )
-                promise.finally(() => dispatch(fetchItemsIntermediate()))
-                promises.push(promise)
-            }
-            dispatch(fetchItemsRequest(promises.length))
-            const results = await Promise.allSettled(promises)
-            return await new Promise<void>((resolve, reject) => {
-                let items = new Array<RSSItem>()
-                results.map((r, i) => {
-                    if (r.status === "fulfilled") items.push(...r.value)
-                    else {
-                        console.log(r.reason)
-                        dispatch(fetchItemsFailure(sources[i], r.reason))
-                    }
-                })
-                insertItems(items)
-                    .then(inserted => {
-                        dispatch(
-                            fetchItemsSuccess(
-                                inserted.reverse(),
-                                getState().items
-                            )
-                        )
-                        resolve()
-                        if (background) {
-                            for (let item of inserted) {
-                                if (item.notify) {
-                                    dispatch(pushNotification(item))
-                                }
-                            }
-                            if (inserted.length > 0) {
-                                window.utils.requestAttention()
-                            }
-                        } else {
-                            dispatch(dismissItems())
+                    await dispatch(syncWithService(background))
+                const state = getState()
+                const schedule = window.settings.getFeedSchedule()
+                const candidates =
+                    sids === null
+                        ? Object.values(state.sources)
+                        : [...new Set(sids)].map(sid => state.sources[sid])
+                const sources = candidates
+                    .filter(source => {
+                        if (!source || source.serviceRef) return false
+                        const job = {
+                            url: source.url,
+                            site: feedWebsite(source),
+                            frequency: resolveSubscriptionPolicy(
+                                source,
+                                state.groups,
+                                state.page.readerPreferences
+                            ).frequency,
                         }
-                        dispatch(setupAutoFetch())
-                    })
-                    .catch(err => {
-                        dispatch(fetchItemsSuccess([], getState().items))
-                        window.utils.showErrorBox(
-                            "A database error has occurred.",
-                            String(err)
+                        return feedIsDue(
+                            job,
+                            source.lastFetched?.getTime() || 0,
+                            schedule,
+                            !background
                         )
-                        console.log(err)
-                        reject(err)
                     })
-            })
+                    .sort(
+                        (a, b) =>
+                            (a.lastFetched?.getTime() || 0) -
+                            (b.lastFetched?.getTime() || 0)
+                    )
+                const jobs = sources.map(source => ({
+                    url: source.url,
+                    site: feedWebsite(source),
+                    frequency: resolveSubscriptionPolicy(
+                        source,
+                        state.groups,
+                        state.page.readerPreferences
+                    ).frequency,
+                }))
+                dispatch(fetchItemsRequest(jobs.length))
+                const results = await runFeedQueue(
+                    jobs,
+                    schedule,
+                    state.page.readerPreferences.siteInterval,
+                    async job => {
+                        const source = Object.values(getState().sources).find(
+                            source => source.url === job.url
+                        )
+                        if (!source) return []
+                        const { items, metadata } = await RSSSource.fetchItems(
+                            source
+                        )
+                        const latest = getState().sources[source.sid]
+                        if (latest)
+                            await dispatch(
+                                updateSource({
+                                    ...latest,
+                                    ...metadata,
+                                    metadataVersion: 1,
+                                    ...(latest.iconOrigin !== "manual" &&
+                                    metadata.feedIcon
+                                        ? {
+                                              iconurl: metadata.feedIcon,
+                                              iconOrigin: "auto",
+                                          }
+                                        : {}),
+                                    lastFetched: new Date(),
+                                })
+                            )
+                        return latest ? items : []
+                    },
+                    value => window.settings.setFeedSchedule(value),
+                    () => dispatch(fetchItemsIntermediate())
+                )
+                return await new Promise<void>((resolve, reject) => {
+                    let items = new Array<RSSItem>()
+                    results.map((r, i) => {
+                        if (r.status === "fulfilled")
+                            items.push(...(r.value || []))
+                        else {
+                            console.log(r.reason)
+                            dispatch(fetchItemsFailure(sources[i], r.reason))
+                        }
+                    })
+                    insertItems(items)
+                        .then(inserted => {
+                            dispatch(
+                                fetchItemsSuccess(
+                                    inserted.reverse(),
+                                    getState().items
+                                )
+                            )
+                            resolve()
+                            if (background) {
+                                for (let item of inserted) {
+                                    if (item.notify) {
+                                        dispatch(pushNotification(item))
+                                    }
+                                }
+                                if (inserted.length > 0) {
+                                    window.utils.requestAttention()
+                                }
+                            } else {
+                                dispatch(dismissItems())
+                            }
+                        })
+                        .catch(err => {
+                            dispatch(fetchItemsSuccess([], getState().items))
+                            window.utils.showErrorBox(
+                                "A database error has occurred.",
+                                String(err)
+                            )
+                            console.log(err)
+                            reject(err)
+                        })
+                })
+            } catch (error) {
+                dispatch(fetchItemsSuccess([], getState().items))
+                throw error
+            } finally {
+                fetchingCycle = false
+                dispatch(setupAutoFetch())
+            }
         }
     }
 }
@@ -383,6 +444,23 @@ const markUnreadDone = (item: RSSItem): ItemActionTypes => ({
     type: MARK_UNREAD,
     item: item,
 })
+
+export function markReadOnOpen(item: RSSItem): AppThunk {
+    return (dispatch, getState) => {
+        const state = getState()
+        const source = state.sources[item.source]
+        if (
+            source &&
+            !state.items[item._id]?.hasRead &&
+            resolveSubscriptionPolicy(
+                source,
+                state.groups,
+                state.page.readerPreferences
+            ).readBehavior === "auto"
+        )
+            dispatch(markRead(item))
+    }
+}
 
 export function markRead(item: RSSItem): AppThunk {
     return (dispatch, getState) => {
@@ -519,7 +597,7 @@ export function itemShortcuts(item: RSSItem, e: KeyboardEvent): AppThunk {
                 break
             case "b":
             case "B":
-                if (!item.hasRead) dispatch(markRead(item))
+                dispatch(markReadOnOpen(item))
                 window.utils.openExternal(item.link, platformCtrl(e))
                 break
             case "s":
@@ -528,7 +606,7 @@ export function itemShortcuts(item: RSSItem, e: KeyboardEvent): AppThunk {
                 break
             case "h":
             case "H":
-                if (!item.hasRead && !item.hidden) dispatch(markRead(item))
+                if (!item.hidden) dispatch(markReadOnOpen(item))
                 dispatch(toggleHidden(item))
                 break
         }

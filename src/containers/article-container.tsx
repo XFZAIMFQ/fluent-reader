@@ -5,6 +5,7 @@ import {
     RSSItem,
     markUnread,
     markRead,
+    markReadOnOpen,
     toggleStarred,
     toggleHidden,
     itemShortcuts,
@@ -56,7 +57,7 @@ const mapDispatchToProps = (dispatch: AppDispatch) => {
         toggleStarred: (item: RSSItem) => dispatch(toggleStarred(item)),
         toggleHidden: (item: RSSItem) => {
             if (!item.hidden) dispatch(dismissItem())
-            if (!item.hasRead && !item.hidden) dispatch(markRead(item))
+            if (!item.hidden) dispatch(markReadOnOpen(item))
             dispatch(toggleHidden(item))
         },
         textMenu: (position: [number, number], text: string, url: string) =>

@@ -22,6 +22,7 @@ import {
     MessageBarButton,
 } from "@fluentui/react"
 import DangerButton from "../utils/danger-button"
+import GroupPolicySettings from "./group-policy"
 
 type GroupsTabProps = {
     sources: SourceState
@@ -323,6 +324,7 @@ class GroupsTab extends React.Component<GroupsTabProps, GroupsTabState> {
 
     render = () => (
         <div className="tab-body">
+            <GroupPolicySettings />
             {this.state.manageGroup && this.state.selectedGroup && (
                 <>
                     <Stack

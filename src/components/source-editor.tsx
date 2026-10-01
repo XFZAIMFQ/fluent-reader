@@ -1,5 +1,5 @@
 import * as React from "react"
-import { useEffect, useState } from "react"
+import { useEffect, useLayoutEffect, useState } from "react"
 import intl from "react-intl-universal"
 import { makeStyles, mergeClasses } from "@griffel/react"
 import {
@@ -8,7 +8,7 @@ import {
     Image24Regular,
     Video24Regular,
 } from "@fluentui/react-icons"
-import { SourceCategory } from "../schema-types"
+import { SourceCategory, SubscriptionPolicy } from "../schema-types"
 import { closeSourceEditor } from "../scripts/models/app"
 import { initFeeds } from "../scripts/models/feed"
 import { setSourceGrouping, SourceGrouping } from "../scripts/models/group"
@@ -21,6 +21,9 @@ import {
 } from "../scripts/models/source"
 import { useAppDispatch, useAppSelector } from "../scripts/reducer"
 import { SourceGroupPicker } from "./utils/source-group-picker"
+import { SubscriptionPolicyFields } from "./utils/subscription-policy-fields"
+import { sourceFrequencyOverride } from "../scripts/subscription-policy"
+import EffectiveSourcePolicy from "./utils/effective-source-policy"
 
 const categories = [
     SourceCategory.Articles,
@@ -234,8 +237,9 @@ export function SourceEditor() {
     const [privateSource, setPrivateSource] = useState(false)
     const [hidden, setHidden] = useState(false)
     const [saving, setSaving] = useState(false)
+    const [policy, setPolicy] = useState<SubscriptionPolicy>({})
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (!source) return
         setName(source.name || "")
         setCategory(source.category || SourceCategory.Articles)
@@ -249,6 +253,10 @@ export function SourceEditor() {
         )
         setPrivateSource(Boolean(source.private))
         setHidden(Boolean(source.hidden))
+        setPolicy({
+            ...source.policy,
+            frequency: sourceFrequencyOverride(source),
+        })
     }, [sid])
 
     useEffect(() => {
@@ -295,6 +303,7 @@ export function SourceEditor() {
                     name: name.trim(),
                     category,
                     private: privateSource,
+                    policy,
                 })
             )
             if (hidden !== source.hidden) {
@@ -386,6 +395,15 @@ export function SourceEditor() {
                             onChange={setGrouping}
                             disabled={saving || refreshingIcon}
                         />
+                    </div>
+                    <div className={classes.field}>
+                        <SubscriptionPolicyFields
+                            id="source-editor-policy"
+                            value={policy}
+                            onChange={setPolicy}
+                            hideFrequency={Boolean(source.serviceRef)}
+                        />
+                        <EffectiveSourcePolicy source={source} />
                     </div>
                     <label className={classes.toggle}>
                         <input

@@ -547,16 +547,10 @@ export const Menu: React.FC = () => {
                                         )
                                         dispatch(initFeeds())
                                     }}
-                                    onContextMenu={
-                                        group.index === undefined
-                                            ? undefined
-                                            : event =>
-                                                  dispatch(
-                                                      openGroupMenu(
-                                                          group.sids,
-                                                          event
-                                                      )
-                                                  )
+                                    onContextMenu={event =>
+                                        dispatch(
+                                            openGroupMenu(group.sids, event)
+                                        )
                                     }>
                                     {group.name}
                                 </button>

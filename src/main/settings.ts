@@ -10,11 +10,41 @@ import {
     ViewConfigs,
     SourceCategory,
     MediaLayout,
+    ReaderPreferences,
+    FeedScheduleState,
+    defaultReaderPreferences,
 } from "../schema-types"
 import { ipcMain, session, nativeTheme, app } from "electron"
 import { WindowManager } from "./window"
 
 export const store = new Store<SchemaTypes>()
+
+ipcMain.on("get-reader-preferences", event => {
+    event.returnValue = {
+        ...defaultReaderPreferences,
+        ...store.get("readerPreferences", defaultReaderPreferences),
+    }
+})
+ipcMain.handle("set-reader-preferences", (_, value: ReaderPreferences) => {
+    store.set("readerPreferences", {
+        ...value,
+        startupFetch: Boolean(value.startupFetch),
+        readingMode: value.readingMode === "inline" ? "inline" : "overlay",
+        readBehavior: value.readBehavior === "manual" ? "manual" : "auto",
+        frequency: Number.isFinite(value.frequency)
+            ? Math.max(0, Math.min(525600, value.frequency))
+            : 60,
+        siteInterval: Number.isFinite(value.siteInterval)
+            ? Math.max(1, Math.min(3600, value.siteInterval))
+            : 10,
+    })
+})
+ipcMain.on("get-feed-schedule", event => {
+    event.returnValue = store.get("feedSchedule", { sources: {}, sites: {} })
+})
+ipcMain.handle("set-feed-schedule", (_, value: FeedScheduleState) => {
+    store.set("feedSchedule", value)
+})
 
 ipcMain.on("get-media-layout", (event, view: SourceCategory) => {
     event.returnValue = store.get("mediaLayouts", {})[view] || {

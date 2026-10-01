@@ -49,6 +49,7 @@ const Nav: React.FC = () => {
     const itemShown = useSelector(
         (state: RootState) =>
             state.page.itemId &&
+            state.page.readerPreferences.readingMode === "overlay" &&
             state.page.contentView !== "all" &&
             state.page.contentView !== SourceCategory.Articles
     )

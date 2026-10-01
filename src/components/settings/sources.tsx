@@ -8,7 +8,11 @@ import {
     ArrowLeft20Regular,
     Search20Regular,
 } from "@fluentui/react-icons"
-import { SourceCategory, SyncService } from "../../schema-types"
+import {
+    SourceCategory,
+    SyncService,
+    SubscriptionPolicy,
+} from "../../schema-types"
 import {
     useAppDispatch,
     useAppSelector,
@@ -37,6 +41,9 @@ import { websiteDomain } from "../../scripts/source-metadata"
 import { FlatButton } from "../utils/FlatButton"
 import { SourceGroupPicker } from "../utils/source-group-picker"
 import { useStyles } from "./source-settings.styles"
+import { SubscriptionPolicyFields } from "../utils/subscription-policy-fields"
+import { sourceFrequencyOverride } from "../../scripts/subscription-policy"
+import EffectiveSourcePolicy from "../utils/effective-source-policy"
 
 const categories = [
     SourceCategory.Articles,
@@ -51,7 +58,7 @@ type Draft = {
     grouping: SourceGrouping
     private: boolean
     hidden: boolean
-    frequency: number
+    policy: SubscriptionPolicy
     openTarget: SourceOpenTarget
     icon: string
 }
@@ -62,7 +69,7 @@ const emptyDraft = (): Draft => ({
     grouping: { mode: "auto" },
     private: false,
     hidden: false,
-    frequency: 60,
+    policy: {},
     openTarget: SourceOpenTarget.Local,
     icon: "",
 })
@@ -108,7 +115,10 @@ const SourcesTab: React.FC = () => {
         grouping: groupingFor(source),
         private: Boolean(source.private),
         hidden: Boolean(source.hidden),
-        frequency: source.fetchFrequency || 0,
+        policy: {
+            ...source.policy,
+            frequency: sourceFrequencyOverride(source),
+        },
         openTarget: source.openTarget,
         icon: source.iconurl || "",
     })
@@ -256,9 +266,7 @@ const SourcesTab: React.FC = () => {
                 category: draft.category,
                 private: draft.private,
                 openTarget: draft.openTarget,
-                fetchFrequency: latest.serviceRef
-                    ? latest.fetchFrequency
-                    : draft.frequency,
+                policy: draft.policy,
             }
             if (!adding && draft.icon.trim() !== (source.iconurl || "")) {
                 changes.iconurl = draft.icon.trim()
@@ -763,86 +771,20 @@ const SourcesTab: React.FC = () => {
                                                 )}
                                             </summary>
                                             <div>
-                                                {!source?.serviceRef && (
-                                                    <label
-                                                        className={
-                                                            classes.field
-                                                        }
-                                                        htmlFor="settings-source-frequency">
-                                                        {intl.get(
-                                                            "sources.fetchFrequency"
-                                                        )}
-                                                        <select
-                                                            id="settings-source-frequency"
-                                                            className={
-                                                                classes.input
-                                                            }
-                                                            value={
-                                                                draft.frequency
-                                                            }
-                                                            onChange={event =>
-                                                                change({
-                                                                    frequency:
-                                                                        Number(
-                                                                            event
-                                                                                .target
-                                                                                .value
-                                                                        ),
-                                                                })
-                                                            }>
-                                                            {[
-                                                                ...new Set([
-                                                                    0,
-                                                                    15,
-                                                                    30,
-                                                                    60,
-                                                                    120,
-                                                                    180,
-                                                                    360,
-                                                                    720,
-                                                                    1440,
-                                                                    draft.frequency,
-                                                                ]),
-                                                            ]
-                                                                .sort(
-                                                                    (a, b) =>
-                                                                        a - b
-                                                                )
-                                                                .map(
-                                                                    minutes => (
-                                                                        <option
-                                                                            key={
-                                                                                minutes
-                                                                            }
-                                                                            value={
-                                                                                minutes
-                                                                            }>
-                                                                            {minutes ===
-                                                                            0
-                                                                                ? intl.get(
-                                                                                      "sources.unlimited"
-                                                                                  )
-                                                                                : minutes <
-                                                                                  60
-                                                                                ? intl.get(
-                                                                                      "time.minute",
-                                                                                      {
-                                                                                          m: minutes,
-                                                                                      }
-                                                                                  )
-                                                                                : intl.get(
-                                                                                      "time.hour",
-                                                                                      {
-                                                                                          h:
-                                                                                              minutes /
-                                                                                              60,
-                                                                                      }
-                                                                                  )}
-                                                                        </option>
-                                                                    )
-                                                                )}
-                                                        </select>
-                                                    </label>
+                                                <SubscriptionPolicyFields
+                                                    id="settings-source-policy"
+                                                    value={draft.policy}
+                                                    onChange={policy =>
+                                                        change({ policy })
+                                                    }
+                                                    hideFrequency={Boolean(
+                                                        source?.serviceRef
+                                                    )}
+                                                />
+                                                {source && (
+                                                    <EffectiveSourcePolicy
+                                                        source={source}
+                                                    />
                                                 )}
                                                 <label
                                                     className={classes.field}

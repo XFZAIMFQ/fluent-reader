@@ -4,6 +4,7 @@ export class SourceGroup {
     name?: string
     expanded?: boolean
     index?: number // available only from menu or groups tab container
+    policy?: SubscriptionPolicy
 
     constructor(sids: number[], name: string = null) {
         name = (name && name.trim()) || "Source group"
@@ -38,6 +39,44 @@ export type ContentView = "all" | SourceCategory
 export interface MediaLayout {
     columns: number
     imageOnly: boolean
+}
+
+export type ReadBehavior = "auto" | "manual"
+export interface SubscriptionPolicy {
+    readBehavior?: ReadBehavior
+    frequency?: number // minutes; absent means inherit, zero means manual only
+}
+export interface ReaderPreferences {
+    startupFetch: boolean
+    readBehavior: ReadBehavior
+    readingMode: "overlay" | "inline"
+    frequency: number
+    siteInterval: number // seconds between requests to the same website
+    domainPolicies: Record<string, SubscriptionPolicy>
+}
+export const defaultReaderPreferences: ReaderPreferences = {
+    startupFetch: true,
+    readBehavior: "auto",
+    readingMode: "overlay",
+    frequency: 60,
+    siteInterval: 10,
+    domainPolicies: {},
+}
+export interface FeedScheduleState {
+    sources: Record<
+        string,
+        {
+            nextDue?: number
+            frequency?: number
+            retryAt?: number
+            failures?: number
+            lastAttempt?: number
+        }
+    >
+    sites: Record<
+        string,
+        { nextAllowed?: number; retryAt?: number; failures?: number }
+    >
 }
 
 export interface SubscribeLinkRequest {
@@ -138,4 +177,6 @@ export type SchemaTypes = {
     useNeDB: boolean
     privacyMode: boolean
     mediaLayouts: Partial<Record<SourceCategory, MediaLayout>>
+    readerPreferences: ReaderPreferences
+    feedSchedule: FeedScheduleState
 }

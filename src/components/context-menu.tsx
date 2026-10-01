@@ -23,6 +23,7 @@ import {
     fetchItems,
     markAllRead,
     markRead,
+    markReadOnOpen,
     markUnread,
     RSSItem,
     toggleHidden,
@@ -106,7 +107,6 @@ function ItemContextMenu() {
             text: intl.get("context.read"),
             iconProps: { iconName: "TextDocument" },
             onClick: () => {
-                dispatch(markRead(item))
                 dispatch(showItem(feedId, item))
             },
         },
@@ -115,7 +115,7 @@ function ItemContextMenu() {
             text: intl.get("openExternal"),
             iconProps: { iconName: "NavigateExternalInline" },
             onClick: e => {
-                dispatch(markRead(item))
+                dispatch(markReadOnOpen(item))
                 globalThis.utils.openExternal(item.link, platformCtrl(e))
             },
         },

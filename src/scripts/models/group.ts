@@ -93,6 +93,8 @@ export function createSourceGroup(name: string): AppThunk<number> {
             }
         }
         let group = new SourceGroup([], name)
+        group.policy =
+            getState().page.readerPreferences.domainPolicies[name.toLowerCase()]
         dispatch(createSourceGroupDone(group))
         groups = getState().groups
         window.settings.saveGroups(groups)
@@ -201,8 +203,8 @@ function updateSourceGroupDone(group: SourceGroup): SourceGroupActionTypes {
     }
 }
 
-export function updateSourceGroup(group: SourceGroup): AppThunk {
-    return (dispatch, getState) => {
+export function updateSourceGroup(group: SourceGroup): AppThunk<Promise<void>> {
+    return async (dispatch, getState) => {
         const name = group.name.trim()
         if (
             !name ||
@@ -216,7 +218,7 @@ export function updateSourceGroup(group: SourceGroup): AppThunk {
             return
         group = { ...group, name }
         dispatch(updateSourceGroupDone(group))
-        window.settings.saveGroups(getState().groups)
+        await window.settings.saveGroups(getState().groups)
     }
 }
 

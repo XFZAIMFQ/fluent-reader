@@ -9,13 +9,73 @@ import ArticleContainer from "../containers/article-container"
 import { SourceCategory, ViewType } from "../schema-types"
 import ArticleSearch from "./utils/article-search"
 import { useAppSelector, useAppDispatch } from "../scripts/reducer"
-import { dismissItem, showOffsetItem } from "../scripts/models/page"
+import {
+    dismissItem,
+    showOffsetItem,
+    selectSources,
+} from "../scripts/models/page"
+import { initFeeds } from "../scripts/models/feed"
 import { ContextMenuType } from "../scripts/models/app"
 import { makeStyles, mergeClasses } from "@fluentui/react-components"
 import { FlatButton } from "./utils/FlatButton"
 import { FlatButtonGroup } from "./utils/FlatButtonGroup"
 
 const usePageClasses = makeStyles({
+    hidden: { display: "none" },
+    inlineReader: {
+        display: "flex",
+        flexDirection: "column",
+        flex: "1 1 auto",
+        minWidth: 0,
+        height: "100%",
+        backgroundColor: "var(--white)",
+    },
+    breadcrumb: {
+        display: "flex",
+        alignItems: "center",
+        gap: "8px",
+        minHeight: "48px",
+        padding: "0 18px",
+        paddingRight: "156px",
+        borderBottom: "1px solid var(--neutralQuaternaryAlt)",
+        color: "var(--neutralSecondary)",
+        fontSize: "12px",
+    },
+    crumb: {
+        minWidth: 0,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+    },
+    categoryCrumb: { width: "auto", padding: "0 6px", flexShrink: 0 },
+    sourceCrumb: {
+        width: "auto",
+        maxWidth: "min(260px, 35%)",
+        padding: "0 6px",
+        cursor: "pointer",
+    },
+    body: {
+        "flex": "1 1 auto",
+        "minHeight": 0,
+        "& > .article": {
+            height: "100%",
+            display: "flex",
+            flexDirection: "column",
+        },
+        "& .modern-embedded-article-header": {
+            height: "40px",
+            flex: "0 0 40px",
+            padding: "0 18px",
+            alignItems: "center",
+        },
+        "& .modern-embedded-article-header::before": { display: "none" },
+        "& webview, & .error-prompt": {
+            flex: "1 1 auto",
+            minHeight: 0,
+            height: "calc(100% - 40px)",
+        },
+    },
+    navigation: { display: "flex", marginLeft: "auto", flexShrink: 0 },
     articleBtn: {
         color: "#fff",
     },
@@ -45,6 +105,13 @@ const Page: React.FC = () => {
         s => s.app.contextMenu.type !== ContextMenuType.Hidden
     )
     const itemId = useAppSelector(s => s.page.itemId)
+    const readingMode = useAppSelector(
+        s => s.page.readerPreferences.readingMode
+    )
+    const currentItem = useAppSelector(s => s.items[itemId])
+    const currentSource = useAppSelector(s =>
+        currentItem ? s.sources[currentItem.source] : null
+    )
     const itemFromFeed = useAppSelector(s => s.page.itemFromFeed)
     const contentView = useAppSelector(s => s.page.contentView)
     const [listWidth, setListWidth] = useState(() => {
@@ -222,11 +289,87 @@ const Page: React.FC = () => {
         </>
     ) : (
         <>
-            <div key="card" className="main modern-collection">
+            <div
+                key="card"
+                className={mergeClasses(
+                    "main modern-collection",
+                    readingMode === "inline" &&
+                        itemId !== null &&
+                        pageClasses.hidden
+                )}>
                 <ArticleSearch />
-                <ModernFeed feedId={feedId} view={contentView} />
+                <ModernFeed
+                    feedId={feedId}
+                    view={contentView}
+                    visible={readingMode !== "inline" || itemId === null}
+                />
             </div>
-            {!!itemId && (
+            {itemId !== null &&
+                readingMode === "inline" &&
+                currentItem &&
+                currentSource && (
+                    <section
+                        className={pageClasses.inlineReader}
+                        data-inline-reader>
+                        <nav
+                            className={pageClasses.breadcrumb}
+                            aria-label={intl.get("policy.breadcrumb")}>
+                            <FlatButton
+                                ariaLabel={intl.get("policy.backToList")}
+                                onClick={() => dispatch(dismissItem())}>
+                                <Icon iconName="ChromeClose" />
+                            </FlatButton>
+                            <FlatButton
+                                styleClass={pageClasses.categoryCrumb}
+                                onClick={() => dispatch(dismissItem())}>
+                                {intl.get(`contentView.${contentView}`)}
+                            </FlatButton>
+                            <span>/</span>
+                            <FlatButton
+                                title={currentSource.name}
+                                styleClass={mergeClasses(
+                                    pageClasses.crumb,
+                                    pageClasses.sourceCrumb
+                                )}
+                                onClick={() => {
+                                    dispatch(
+                                        selectSources(
+                                            [currentSource.sid],
+                                            `s-${currentSource.sid}`,
+                                            currentSource.name
+                                        )
+                                    )
+                                    dispatch(initFeeds())
+                                }}>
+                                {currentSource.name}
+                            </FlatButton>
+                            <span>/</span>
+                            <span
+                                className={pageClasses.crumb}
+                                title={currentItem.title}>
+                                {currentItem.title}
+                            </span>
+                            {itemFromFeed && (
+                                <div className={pageClasses.navigation}>
+                                    <FlatButton
+                                        ariaLabel={intl.get("policy.previous")}
+                                        onClick={prevItem}>
+                                        <Icon iconName="Back" />
+                                    </FlatButton>
+                                    <FlatButton
+                                        ariaLabel={intl.get("policy.next")}
+                                        onClick={nextItem}>
+                                        <Icon iconName="Forward" />
+                                    </FlatButton>
+                                </div>
+                            )}
+                        </nav>
+                        <div className={pageClasses.body}>
+                            <ArticleContainer itemId={itemId} embedded />
+                        </div>
+                    </section>
+                )}
+            {itemId !== null && readingMode === "overlay" && (
                 <FocusTrapZone
                     disabled={contextOn}
                     ignoreExternalFocusing={true}

@@ -7,10 +7,20 @@ import {
     ViewConfigs,
     MediaLayout,
     SourceCategory,
+    ReaderPreferences,
+    FeedScheduleState,
 } from "../schema-types"
 import { ipcRenderer } from "electron"
 
 const settingsBridge = {
+    getReaderPreferences: (): ReaderPreferences =>
+        ipcRenderer.sendSync("get-reader-preferences"),
+    setReaderPreferences: (value: ReaderPreferences): Promise<void> =>
+        ipcRenderer.invoke("set-reader-preferences", value),
+    getFeedSchedule: (): FeedScheduleState =>
+        ipcRenderer.sendSync("get-feed-schedule"),
+    setFeedSchedule: (value: FeedScheduleState): Promise<void> =>
+        ipcRenderer.invoke("set-feed-schedule", value),
     getMediaLayout: (view: SourceCategory): MediaLayout =>
         ipcRenderer.sendSync("get-media-layout", view),
     setMediaLayout: (
@@ -18,7 +28,7 @@ const settingsBridge = {
         layout: MediaLayout
     ): Promise<void> => ipcRenderer.invoke("set-media-layout", view, layout),
     saveGroups: (groups: SourceGroup[]) => {
-        ipcRenderer.invoke("set-groups", groups)
+        return ipcRenderer.invoke("set-groups", groups)
     },
     loadGroups: (): SourceGroup[] => {
         return ipcRenderer.sendSync("get-groups")

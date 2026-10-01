@@ -1,7 +1,7 @@
 import * as React from "react"
 import { Icon } from "@fluentui/react"
 import { openItemMenu } from "../../scripts/models/app"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { makeStyles, mergeClasses } from "@griffel/react"
 import intl from "react-intl-universal"
 import { ContentView, SourceCategory } from "../../schema-types"
@@ -9,6 +9,7 @@ import { loadMore } from "../../scripts/models/feed"
 import {
     getItemMedia,
     markRead,
+    markReadOnOpen,
     markUnread,
     RSSItem,
     toggleStarred,
@@ -18,6 +19,7 @@ import { useAppDispatch, useAppSelector } from "../../scripts/reducer"
 import Time from "../utils/time"
 import FeedToolbar from "./feed-toolbar"
 import { Star16Filled } from "@fluentui/react-icons"
+import { SourceOpenTarget } from "../../scripts/models/source"
 
 const useStyles = makeStyles({
     pictures: {
@@ -81,10 +83,11 @@ const useStyles = makeStyles({
     },
 })
 
-const ModernFeed: React.FC<{ feedId: string; view: ContentView }> = ({
-    feedId,
-    view,
-}) => {
+const ModernFeed: React.FC<{
+    feedId: string
+    view: ContentView
+    visible?: boolean
+}> = ({ feedId, view, visible = true }) => {
     const dispatch = useAppDispatch()
     const classes = useStyles()
     const layout = useAppSelector(s => s.page.mediaLayouts[view])
@@ -96,6 +99,7 @@ const ModernFeed: React.FC<{ feedId: string; view: ContentView }> = ({
         const element = scrollRef.current
         if (!element || !isMediaView) return
         const observer = new ResizeObserver(() => {
+            if (!element.clientWidth) return
             const styles = getComputedStyle(element)
             setWidth(
                 element.clientWidth -
@@ -131,14 +135,24 @@ const ModernFeed: React.FC<{ feedId: string; view: ContentView }> = ({
     )
     const sources = useAppSelector(s => s.sources)
     const selectedKey = useAppSelector(s => s.app.menuKey)
+    const scrollPosition = useRef({ key: "", top: 0 })
+    useLayoutEffect(() => {
+        const key = `${view}-${selectedKey}`
+        if (scrollPosition.current.key !== key)
+            scrollPosition.current = { key, top: 0 }
+        if (visible && scrollRef.current)
+            scrollRef.current.scrollTop = scrollPosition.current.top
+    }, [visible, view, selectedKey])
     const selectedTitle = useAppSelector(s => s.app.title)
     const selectedSource = selectedKey.startsWith("s-")
         ? sources[Number(selectedKey.slice(2))]
         : null
 
     const open = (item: RSSItem) => {
-        dispatch(markRead(item))
-        dispatch(showItem(feedId, item))
+        if (sources[item.source]?.openTarget === SourceOpenTarget.External) {
+            dispatch(markReadOnOpen(item))
+            window.utils.openExternal(item.link)
+        } else dispatch(showItem(feedId, item))
     }
 
     const scrollTitle = (event: React.MouseEvent<HTMLHeadingElement>) => {
@@ -175,7 +189,14 @@ const ModernFeed: React.FC<{ feedId: string; view: ContentView }> = ({
                 {!selectedSource && <span>{items.length}</span>}
                 <FeedToolbar />
             </header>
-            <div className="modern-feed-scroll" ref={scrollRef}>
+            <div
+                className="modern-feed-scroll"
+                ref={scrollRef}
+                onScroll={event => {
+                    if (visible)
+                        scrollPosition.current.top =
+                            event.currentTarget.scrollTop
+                }}>
                 <div
                     className="modern-feed-items"
                     style={
@@ -196,6 +217,7 @@ const ModernFeed: React.FC<{ feedId: string; view: ContentView }> = ({
                         return (
                             <article
                                 key={item._id}
+                                data-entry-id={item._id}
                                 className={`modern-entry ${
                                     item.hasRead ? "read" : ""
                                 }`}

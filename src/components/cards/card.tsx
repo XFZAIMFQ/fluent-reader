@@ -39,7 +39,6 @@ export namespace Card {
                 break
             }
             default: {
-                props.markRead(props.item)
                 props.showItem(props.feedId, props.item)
                 break
             }
