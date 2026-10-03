@@ -1,4 +1,8 @@
-import { FeedScheduleState, UpdateStrategy } from "../schema-types"
+import {
+    FeedFailureReason,
+    FeedScheduleState,
+    UpdateStrategy,
+} from "../schema-types"
 
 export interface FeedJob {
     url: string
@@ -114,6 +118,18 @@ export interface QueueOptions {
     resolve?: (job: FeedJob) => FeedJob | undefined
     deferred?: (at: number) => void
     interval?: () => number
+    cancelled?: () => boolean
+    blocked?: (
+        job: FeedJob,
+        block: FeedBlock
+    ) => Promise<"force" | "resume" | "cancel">
+    failed?: (job: FeedJob, reason: FeedFailureReason, stopped: boolean) => void
+}
+
+export interface FeedBlock {
+    kind: "spacing" | "cooldown"
+    until: number
+    reason?: FeedFailureReason
 }
 
 export function feedIsDue(
@@ -177,10 +193,15 @@ export async function runFeedQueue<T>(
     const queuesResult = await Promise.allSettled(
         [...queues].map(async ([site, indices]) => {
             const website = (schedule.sites[site] ||= {})
+            let stoppedSite = false
             for (const i of indices) {
                 const skip = () => {
                     results[i] = { status: "fulfilled", value: undefined }
                     settled()
+                }
+                if (stoppedSite || options.cancelled?.()) {
+                    skip()
+                    continue
                 }
                 if (options.background && options.stopped?.()) {
                     options.deferred?.(timing.now() + 1000)
@@ -193,12 +214,31 @@ export async function runFeedQueue<T>(
                     continue
                 }
                 const record = (schedule.sources[job.url] ||= {})
-                if (
-                    (website.retryAt || 0) > timing.now() ||
-                    (record.retryAt || 0) > timing.now()
-                ) {
-                    skip()
-                    continue
+                let force = false
+                const cooldown = Math.max(
+                    website.retryAt || 0,
+                    record.retryAt || 0
+                )
+                if (cooldown > timing.now()) {
+                    if (!options.background && options.blocked) {
+                        const decision = await options.blocked(job, {
+                            kind: "cooldown",
+                            until: cooldown,
+                            reason:
+                                (website.retryAt || 0) > timing.now()
+                                    ? website.failureReason
+                                    : record.failureReason,
+                        })
+                        force = decision === "force"
+                        stoppedSite = decision === "cancel"
+                        if (stoppedSite || options.cancelled?.()) {
+                            skip()
+                            continue
+                        }
+                    } else {
+                        skip()
+                        continue
+                    }
                 }
                 const eligible = options.background
                     ? backgroundEligibleAt(
@@ -213,17 +253,42 @@ export async function runFeedQueue<T>(
                     skip()
                     continue
                 }
-                const wait = (website.nextAllowed || 0) - timing.now()
+                if (
+                    !force &&
+                    !options.background &&
+                    options.blocked &&
+                    (website.nextAllowed || 0) > timing.now()
+                ) {
+                    const decision = await options.blocked(job, {
+                        kind: "spacing",
+                        until: website.nextAllowed,
+                    })
+                    force = decision === "force"
+                    stoppedSite = decision === "cancel"
+                }
+                if (stoppedSite || options.cancelled?.()) {
+                    skip()
+                    continue
+                }
+                const wait = force
+                    ? 0
+                    : (website.nextAllowed || 0) - timing.now()
                 // Check settings between short sleeps so a long configured gap can pause promptly.
                 let remaining = wait
                 while (
                     remaining > 0 &&
+                    !options.cancelled?.() &&
                     !(options.background && options.stopped?.())
                 ) {
                     await timing.sleep(Math.min(remaining, 250))
                     remaining = (website.nextAllowed || 0) - timing.now()
                 }
                 await acquire()
+                if (options.cancelled?.()) {
+                    release()
+                    skip()
+                    continue
+                }
                 if (options.background && options.stopped?.()) {
                     release()
                     options.deferred?.(timing.now() + 1000)
@@ -253,6 +318,7 @@ export async function runFeedQueue<T>(
                     const value = await fetch(job)
                     record.failures = 0
                     record.retryAt = 0
+                    record.failureReason = undefined
                     record.frequency = job.frequency
                     record.strategy = job.strategy || "interval"
                     record.planVersion = 1
@@ -265,9 +331,16 @@ export async function runFeedQueue<T>(
                     )
                     website.failures = 0
                     website.retryAt = 0
+                    website.failureReason = undefined
                     results[i] = { status: "fulfilled", value }
                 } catch (error) {
                     const failure = error as FeedFailure
+                    const reason: FeedFailureReason = failure.challenge
+                        ? "challenge"
+                        : failure.status === 429 || failure.status === 403
+                        ? "rateLimit"
+                        : "error"
+                    record.failureReason = reason
                     record.failures = (record.failures || 0) + 1
                     website.failures = (website.failures || 0) + 1
                     const retry = Math.min(
@@ -283,11 +356,16 @@ export async function runFeedQueue<T>(
                         failure.status === 403 ||
                         failure.status === 429 ||
                         website.failures >= 3
-                    )
+                    ) {
                         website.retryAt = Math.max(
                             timing.now() + 1800000,
                             record.retryAt
                         )
+                        website.failureReason = reason
+                        stoppedSite = true
+                    }
+                    if (!options.background)
+                        options.failed?.(job, reason, stoppedSite)
                     results[i] = { status: "rejected", reason: error }
                 } finally {
                     website.nextAllowed =

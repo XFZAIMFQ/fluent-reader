@@ -5,7 +5,7 @@ import { useSelector, useDispatch } from "react-redux"
 import { Icon } from "@fluentui/react/lib/Icon"
 import { IObjectWithKey } from "@fluentui/react"
 import { RootState } from "../scripts/reducer"
-import { fetchItems, markAllRead } from "../scripts/models/item"
+import { fetchCurrentItems, markAllRead } from "../scripts/models/item"
 import { makeStyles, mergeClasses } from "@fluentui/react-components"
 import { toggleLogMenu, toggleSettings } from "../scripts/models/app"
 import { toggleSearch } from "../scripts/models/page"
@@ -94,7 +94,7 @@ const Nav: React.FC = () => {
     )
 
     const fetch = useCallback(() => {
-        if (canFetch()) dispatch(fetchItems())
+        if (canFetch()) dispatch(fetchCurrentItems())
     }, [canFetch, dispatch])
 
     const menu = useCallback(

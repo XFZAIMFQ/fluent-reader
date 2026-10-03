@@ -350,6 +350,26 @@
         "loadError": "本地文章读取失败。",
         "retry": "重试"
     },
+    "refreshNotice": {
+        "title": "手动刷新状态",
+        "waiting": "{count} 个订阅源正在等待刷新",
+        "working": "正在继续刷新",
+        "finished": "部分订阅源未能更新",
+        "spacing": "同站请求间隔，将在 {time}后刷新。",
+        "cooldown": "{reason}，约 {time}后恢复请求。",
+        "rateLimit": "网站限流或拒绝访问",
+        "challenge": "网站要求人机验证",
+        "error": "上次请求失败",
+        "failed": "{reason}，详情可查看更新日志。",
+        "stopped": "{reason}，该站本轮剩余请求已停止。",
+        "seconds": "{n} 秒",
+        "minutes": "{n} 分钟",
+        "progress": "更新进度 {done}/{total}。立即刷新只跳过本次等待，同站请求仍串行处理。",
+        "refreshNow": "立即刷新",
+        "tryNow": "立即尝试",
+        "cancel": "取消剩余请求",
+        "dismiss": "关闭并取消剩余请求"
+    },
     "policy": {
         "readBehavior": "打开内容后的已读行为",
         "inherit": "跟随分组／全局默认",

@@ -4,6 +4,7 @@ import intl from "react-intl-universal"
 import type { MyParserItem } from "../utils"
 import { resolveSubscriptionPolicy, feedWebsite } from "../subscription-policy"
 import { feedIsDue, runFeedQueue, planFeed } from "../feed-scheduler"
+import { createRefreshFeedback } from "./refresh-feedback"
 import {
     domParser,
     htmlDecode,
@@ -333,6 +334,24 @@ export async function insertItems(items: RSSItem[]): Promise<RSSItem[]> {
         .exec()) as RSSItem[]
 }
 
+export function fetchCurrentItems(): AppThunk<Promise<void>> {
+    return (dispatch, getState) => {
+        const state = getState()
+        const feed = state.feeds[state.page.feedId]
+        const sids = [...new Set(feed?.sids || [])].filter(sid => {
+            const source = state.sources[sid]
+            return (
+                source &&
+                !source.hidden &&
+                (!state.app.privacyMode || !source.private)
+            )
+        })
+        return sids.length
+            ? dispatch(fetchItems(false, sids))
+            : Promise.resolve()
+    }
+}
+
 let fetchingCycle = false
 export function fetchItems(
     background = false,
@@ -347,6 +366,15 @@ export function fetchItems(
         ) {
             fetchingCycle = true
             let nextCheckAt = 0
+            const feedback = background
+                ? undefined
+                : createRefreshFeedback(
+                      dispatch,
+                      job =>
+                          Object.values(getState().sources).find(
+                              source => source.url === job.url
+                          )?.name || job.site
+                  )
             try {
                 if (
                     sids === null ||
@@ -413,13 +441,15 @@ export function fetchItems(
                     planFeed(job, source.lastFetched?.getTime() || 0, schedule)
                 }
                 await window.settings.setFeedSchedule(schedule)
-                const sources = eligibleSources.filter(source =>
-                    feedIsDue(
-                        jobFor(source),
-                        source.lastFetched?.getTime() || 0,
-                        schedule,
-                        !background
-                    )
+                const sources = eligibleSources.filter(
+                    source =>
+                        !background ||
+                        feedIsDue(
+                            jobFor(source),
+                            source.lastFetched?.getTime() || 0,
+                            schedule,
+                            !background
+                        )
                 )
                 const jobs = sources.map(jobFor)
                 dispatch(fetchItemsRequest(jobs.length, background))
@@ -491,6 +521,9 @@ export function fetchItems(
                     undefined,
                     {
                         background,
+                        blocked: feedback?.blocked,
+                        cancelled: feedback?.cancelled,
+                        failed: feedback?.failed,
                         siteLimit:
                             state.page.readerPreferences.backgroundSiteLimit,
                         stopped: () =>
@@ -510,12 +543,13 @@ export function fetchItems(
                                 source.lastFetched?.getTime() || 0,
                                 schedule
                             )
-                            return feedIsDue(
-                                current,
-                                source.lastFetched?.getTime() || 0,
-                                schedule,
-                                !background
-                            )
+                            return !background ||
+                                feedIsDue(
+                                    current,
+                                    source.lastFetched?.getTime() || 0,
+                                    schedule,
+                                    !background
+                                )
                                 ? current
                                 : undefined
                         },
@@ -536,6 +570,7 @@ export function fetchItems(
                 dispatch(fetchItemsSuccess([], getState().items))
                 throw error
             } finally {
+                feedback?.finish()
                 fetchingCycle = false
                 dispatch(setupAutoFetch(background ? nextCheckAt : undefined))
             }

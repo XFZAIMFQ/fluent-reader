@@ -352,6 +352,26 @@
         "loadError": "Could not read cached articles.",
         "retry": "Retry"
     },
+    "refreshNotice": {
+        "title": "Manual refresh status",
+        "waiting": "Waiting to refresh {count} subscription(s)",
+        "working": "Refresh in progress",
+        "finished": "Some subscriptions could not be updated",
+        "spacing": "Same website request gap. Refreshing in {time}.",
+        "cooldown": "{reason}. Requests resume in about {time}.",
+        "rateLimit": "Website rate limit or access denied",
+        "challenge": "Website verification required",
+        "error": "Previous request failed",
+        "failed": "{reason}. See the update log for details.",
+        "stopped": "{reason}. Remaining requests to this website have stopped for this refresh.",
+        "seconds": "{n} sec",
+        "minutes": "{n} min",
+        "progress": "Updated {done}/{total}. Immediate refresh skips only the current wait; website requests stay serial.",
+        "refreshNow": "Refresh now",
+        "tryNow": "Try now",
+        "cancel": "Cancel remaining requests",
+        "dismiss": "Close and cancel remaining requests"
+    },
     "policy": {
         "readBehavior": "Read status on opening",
         "inherit": "Follow group / default",

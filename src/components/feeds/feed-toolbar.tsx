@@ -4,7 +4,7 @@ import { Icon, ContextualMenu } from "@fluentui/react"
 import { useState } from "react"
 import { SourceCategory } from "../../schema-types"
 import { makeStyles, mergeClasses } from "@fluentui/react-components"
-import { fetchItems } from "../../scripts/models/item"
+import { fetchCurrentItems } from "../../scripts/models/item"
 import { FilterType } from "../../scripts/models/feed"
 import { switchFilter, setMediaLayout } from "../../scripts/models/page"
 import { openMarkAllMenu } from "../../scripts/models/app"
@@ -115,7 +115,7 @@ const FeedToolbar: React.FC = () => {
                 disabled={fetching}
                 ariaLabel={intl.get("nav.refresh")}
                 title={intl.get("nav.refresh")}
-                onClick={() => dispatch(fetchItems())}>
+                onClick={() => dispatch(fetchCurrentItems())}>
                 <Icon iconName="Refresh" />
             </FlatButton>
             <FlatButton

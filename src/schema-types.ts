@@ -70,6 +70,8 @@ export const defaultReaderPreferences: ReaderPreferences = {
     domainPolicies: {},
     groupOrder: [],
 }
+export type FeedFailureReason = "rateLimit" | "challenge" | "error"
+
 export interface FeedScheduleState {
     sources: Record<
         string,
@@ -77,6 +79,7 @@ export interface FeedScheduleState {
             nextDue?: number
             frequency?: number
             retryAt?: number
+            failureReason?: FeedFailureReason
             failures?: number
             lastAttempt?: number
             publishedAt?: number
@@ -90,6 +93,7 @@ export interface FeedScheduleState {
         {
             nextAllowed?: number
             retryAt?: number
+            failureReason?: FeedFailureReason
             failures?: number
             attempts?: number[]
             backgroundNextAllowed?: number

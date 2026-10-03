@@ -9,6 +9,7 @@ import { SourceEditor } from "./source-editor"
 import { useAppDispatch, useAppSelector } from "../scripts/reducer"
 import { ContextMenu } from "./context-menu"
 import LogMenu from "./log-menu"
+import RefreshNotice from "./refresh-notice"
 import { FluentProvider, makeStyles } from "@fluentui/react-components"
 import { useEffect, useMemo, useState } from "react"
 import { ThemeProvider } from "@fluentui/react"
@@ -64,6 +65,7 @@ const Root: React.FC = () => {
                             <Settings />
                             <SourceEditor />
                             <ContextMenu />
+                            <RefreshNotice />
                         </div>
                     </CustomStyleHooksProvider>
                 </FluentProvider>
