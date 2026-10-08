@@ -24,6 +24,8 @@ import { SourceGroupPicker } from "./utils/source-group-picker"
 import { SubscriptionPolicyFields } from "./utils/subscription-policy-fields"
 import { sourceFrequencyOverride } from "../scripts/subscription-policy"
 import EffectiveSourcePolicy from "./utils/effective-source-policy"
+import ContentFilterFields from "./utils/content-filter-fields"
+import { validContentFilter } from "../scripts/content-filter"
 
 const categories = [
     SourceCategory.Articles,
@@ -288,6 +290,7 @@ export function SourceEditor() {
             !name.trim() ||
             saving ||
             refreshingIcon ||
+            !validContentFilter(policy.contentFilter) ||
             (grouping.mode === "manual" && !grouping.name?.trim())
         )
             return
@@ -406,6 +409,16 @@ export function SourceEditor() {
                         />
                         <EffectiveSourcePolicy source={source} />
                     </div>
+                    <ContentFilterFields
+                        id="source-editor-filter"
+                        source={source}
+                        grouping={grouping}
+                        value={policy.contentFilter}
+                        disabled={saving || refreshingIcon}
+                        onChange={contentFilter =>
+                            setPolicy({ ...policy, contentFilter })
+                        }
+                    />
                     <label className={classes.toggle}>
                         <input
                             type="checkbox"
@@ -527,7 +540,11 @@ export function SourceEditor() {
                     </button>
                     <button
                         type="submit"
-                        disabled={saving || refreshingIcon}
+                        disabled={
+                            saving ||
+                            refreshingIcon ||
+                            !validContentFilter(policy.contentFilter)
+                        }
                         className={mergeClasses(
                             classes.button,
                             classes.primary

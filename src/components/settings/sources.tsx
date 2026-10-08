@@ -39,6 +39,8 @@ import {
 } from "../../scripts/models/source"
 import { urlTest, validateFavicon } from "../../scripts/utils"
 import { websiteDomain } from "../../scripts/source-metadata"
+import ContentFilterFields from "../utils/content-filter-fields"
+import { validContentFilter } from "../../scripts/content-filter"
 import { FlatButton } from "../utils/FlatButton"
 import { SourceGroupPicker } from "../utils/source-group-picker"
 import { useStyles } from "./source-settings.styles"
@@ -236,6 +238,7 @@ const SourcesTab: React.FC = () => {
             return
         }
         if (
+            !validContentFilter(draft.policy.contentFilter) ||
             (!draft.name.trim() && !adding) ||
             (draft.grouping.mode === "manual" && !draft.grouping.name?.trim())
         )
@@ -340,7 +343,8 @@ const SourcesTab: React.FC = () => {
     const invalid = batch
         ? (!batchCategory && !batchGroup) ||
           (batchGroup?.mode === "manual" && !batchGroup.name?.trim())
-        : (!adding && !draft.name.trim()) ||
+        : !validContentFilter(draft.policy.contentFilter) ||
+          (!adding && !draft.name.trim()) ||
           (adding && !urlTest(draft.url.trim())) ||
           (draft.grouping.mode === "manual" && !draft.grouping.name?.trim())
 
@@ -772,6 +776,21 @@ const SourcesTab: React.FC = () => {
                                                 </small>
                                             </span>
                                         </label>
+                                        <ContentFilterFields
+                                            id="settings-source-filter"
+                                            source={source}
+                                            grouping={draft.grouping}
+                                            value={draft.policy.contentFilter}
+                                            disabled={busy}
+                                            onChange={contentFilter =>
+                                                change({
+                                                    policy: {
+                                                        ...draft.policy,
+                                                        contentFilter,
+                                                    },
+                                                })
+                                            }
+                                        />
                                         <details className={classes.advanced}>
                                             <summary>
                                                 {intl.get(

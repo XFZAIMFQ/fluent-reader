@@ -16,6 +16,9 @@ import { ThemeProvider } from "@fluentui/react"
 import { CUSTOM_STYLE_HOOKS, createAppTheme } from "./utils/theme"
 import { CustomStyleHooksProvider_unstable as CustomStyleHooksProvider } from "@fluentui/react-shared-contexts"
 import { getFontFamilyForLocale } from "../scripts/settings"
+import { initFeeds } from "../scripts/models/feed"
+import { updateUnreadCounts } from "../scripts/models/source"
+import { websiteDomain } from "../scripts/source-metadata"
 
 const useClasses = makeStyles({
     root: {
@@ -26,6 +29,36 @@ const useClasses = makeStyles({
 const Root: React.FC = () => {
     const dispatch = useAppDispatch()
     const locale = useAppSelector(s => s.app.locale)
+    const sourceInit = useAppSelector(s => s.app.sourceInit)
+    const filterSettings = useAppSelector(s =>
+        JSON.stringify({
+            sources: Object.values(s.sources).map(source => [
+                source.sid,
+                websiteDomain(source.siteUrl),
+                source.autoGroup,
+                source.policy?.contentFilter,
+            ]),
+            groups: s.groups.map(group => [
+                group.isMultiple,
+                group.name,
+                group.sids,
+                group.policy?.contentFilter,
+            ]),
+            domains: Object.entries(
+                s.page.readerPreferences.domainPolicies
+            ).map(([domain, policy]) => [domain, policy.contentFilter]),
+        })
+    )
+    useEffect(() => {
+        if (!sourceInit) return
+        const timer = setTimeout(() => void dispatch(initFeeds(true)), 50)
+        return () => clearTimeout(timer)
+    }, [sourceInit, filterSettings])
+    useEffect(() => {
+        if (!sourceInit) return
+        const timer = setTimeout(() => void dispatch(updateUnreadCounts()), 100)
+        return () => clearTimeout(timer)
+    }, [sourceInit, filterSettings])
 
     const classes = useClasses()
     const [isDarkMode, setIsDarkMode] = useState(() =>

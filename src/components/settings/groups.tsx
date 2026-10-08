@@ -43,6 +43,7 @@ import { useListReorder } from "../utils/use-list-reorder"
 import GroupPolicySettings from "./group-policy"
 import { useStyles } from "./source-settings.styles"
 import { useGroupStyles } from "./group-settings.styles"
+import { validContentFilter } from "../../scripts/content-filter"
 
 const emptyPolicy: SubscriptionPolicy = {}
 const folderKey = (name: string) => `folder-${encodeURIComponent(name)}`
@@ -205,6 +206,7 @@ export default function GroupsTab() {
     }
     const save = async () => {
         if (!folder || ungrouped) return
+        if (!validContentFilter(draft.contentFilter)) return
         const nextName = name.trim(),
             invalid =
                 folder.index === undefined
@@ -721,6 +723,8 @@ export default function GroupsTab() {
                                                 value={draft}
                                                 onChange={changePolicy}
                                                 disabled={busy}
+                                                sids={folder.sids}
+                                                name={folder.name}
                                             />
                                         </div>
                                         <div className={classes.actions}>
@@ -750,7 +754,13 @@ export default function GroupsTab() {
                                                     classes.button,
                                                     classes.primary
                                                 )}
-                                                disabled={busy || !dirty}
+                                                disabled={
+                                                    busy ||
+                                                    !dirty ||
+                                                    !validContentFilter(
+                                                        draft.contentFilter
+                                                    )
+                                                }
                                                 onClick={() => void save()}>
                                                 {intl.get("policy.save")}
                                             </FlatButton>

@@ -3,6 +3,7 @@ import locales from "./i18n/_locales"
 import { SourceCategory, ThemeSettings } from "../schema-types"
 import intl from "react-intl-universal"
 import { SourceTextDirection } from "./models/source"
+import { articleText } from "./item-content"
 
 export function getFontFamilyForLocale(locale: string): string {
     switch (locale) {
@@ -101,6 +102,8 @@ export async function importAll() {
             i.date = new Date(i.date)
             i.fetchedDate = new Date(i.fetchedDate)
             if (!i.media) i.media = "{}"
+            if (!i.tags) i.tags = ""
+            i.contentText = articleText(i.content, i.snippet)
             return db.items.createRow(i)
         })
         await db.sourcesDB.insert().into(db.sources).values(sRows).exec()

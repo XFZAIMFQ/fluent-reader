@@ -2,6 +2,13 @@ import * as db from "../db"
 import lf from "lovefield"
 import intl from "react-intl-universal"
 import type { MyParserItem } from "../utils"
+import { articleText, articleTags } from "../item-content"
+import {
+    contentFiltersForSources,
+    contentFilterPredicate,
+    resolveContentFilters,
+    matchesContentFilters,
+} from "../content-filter"
 import { resolveSubscriptionPolicy, feedWebsite } from "../subscription-policy"
 import { feedIsDue, runFeedQueue, planFeed } from "../feed-scheduler"
 import { createRefreshFeedback } from "./refresh-feedback"
@@ -20,6 +27,9 @@ import {
     dismissItems,
     FeedFilter,
     RSSFeed,
+    withContentFilters,
+    bypassContentFilters,
+    initFeeds,
 } from "./feed"
 import {
     pushNotification,
@@ -65,6 +75,8 @@ export class RSSItem {
     notify: boolean
     serviceRef?: string
     media: string
+    tags: string
+    contentText: string
 
     constructor(item: MyParserItem, source: RSSSource) {
         for (let field of ["title", "link", "creator"]) {
@@ -87,6 +99,8 @@ export class RSSItem {
         this.hidden = false
         this.notify = false
         this.media = "{}"
+        this.tags = articleTags(item.categories)
+        this.contentText = ""
     }
 
     static parseContent(item: RSSItem, parsed: MyParserItem) {
@@ -101,6 +115,7 @@ export class RSSItem {
             item.content = parsed.content || ""
             item.snippet = htmlDecode(parsed.contentSnippet || "")
         }
+        item.contentText = articleText(item.content, item.snippet)
         if (parsed.thumb) {
             item.thumb = parsed.thumb
         } else if (parsed.image?.$?.url) {
@@ -225,6 +240,7 @@ interface MarkAllReadAction {
     sids: number[]
     time?: number
     before?: boolean
+    iids?: Set<number>
 }
 
 interface MarkUnreadAction {
@@ -270,7 +286,7 @@ export function loadCachedSourceEntries(
         }
         if (!available()) return []
         const items = await RSSFeed.loadFeed(
-            new RSSFeed(null, [sid], filter),
+            withContentFilters(new RSSFeed(null, [sid], filter), getState()),
             skip,
             quantity
         )
@@ -325,7 +341,12 @@ export function fetchItemsIntermediate(): ItemActionTypes {
 export async function insertItems(items: RSSItem[]): Promise<RSSItem[]> {
     items.sort((a, b) => a.date.getTime() - b.date.getTime())
     const rows = items.map(item =>
-        db.items.createRow({ ...item, media: item.media || "{}" })
+        db.items.createRow({
+            ...item,
+            media: item.media || "{}",
+            tags: item.tags || "",
+            contentText: articleText(item.content, item.snippet),
+        })
     )
     return (await db.itemsDB
         .insert()
@@ -462,7 +483,7 @@ export function fetchItems(
                             source => source.url === job.url
                         )
                         if (!source) return []
-                        const { items, metadata, publishedAt } =
+                        const { items, metadata, publishedAt, updatedItems } =
                             await RSSSource.fetchItems(source)
                         const latest = getState().sources[source.sid]
                         if (latest?.url !== source.url) return []
@@ -508,9 +529,23 @@ export function fetchItems(
                                 false
                             )
                         )
+                        if (updatedItems.length) {
+                            dispatch({ type: CACHE_ITEMS, items: updatedItems })
+                            await dispatch(initFeeds(true))
+                        }
                         if (background) {
                             for (const item of inserted)
-                                if (item.notify)
+                                if (
+                                    item.notify &&
+                                    matchesContentFilters(
+                                        resolveContentFilters(
+                                            getState().sources[item.source],
+                                            getState().groups,
+                                            getState().page.readerPreferences
+                                        ),
+                                        item
+                                    )
+                                )
                                     dispatch(pushNotification(item))
                             if (inserted.length) window.utils.requestAttention()
                         }
@@ -565,6 +600,7 @@ export function fetchItems(
                         dispatch(fetchItemsFailure(sources[i], result.reason))
                 })
                 dispatch(fetchItemsSuccess([], getState().items))
+                await dispatch(updateUnreadCounts())
                 if (!background) dispatch(dismissItems())
             } catch (error) {
                 dispatch(fetchItemsSuccess([], getState().items))
@@ -614,6 +650,7 @@ export function markRead(item: RSSItem): AppThunk {
                 .where(db.items._id.eq(item._id))
                 .set(db.items.hasRead, true)
                 .exec()
+                .then(() => dispatch(updateUnreadCounts()))
             dispatch(markReadDone(item))
             if (item.serviceRef) {
                 dispatch(dispatch(getServiceHooks()).markRead?.(item))
@@ -629,6 +666,8 @@ export function markAllRead(
 ): AppThunk<Promise<void>> {
     return async (dispatch, getState) => {
         let state = getState()
+        const currentFeed = state.feeds[state.page.feedId]
+        const useCurrentFilter = sids === null
         if (sids === null) {
             let feed = state.feeds[state.page.feedId]
             sids = feed.sids
@@ -637,41 +676,71 @@ export function markAllRead(
             sids = sids.filter(sid => !state.sources[sid]?.private)
             if (sids.length === 0) return
         }
-        const action = dispatch(getServiceHooks()).markAllRead?.(
-            sids,
-            date,
-            before
-        )
-        if (action) await dispatch(action)
         const predicates: lf.Predicate[] = [
             db.items.source.in(sids),
             db.items.hasRead.eq(false),
         ]
+        if (useCurrentFilter && currentFeed)
+            predicates.push(...FeedFilter.toPredicates(currentFeed.filter))
+        else predicates.push(db.items.hidden.eq(false))
+        if (!currentFeed || !bypassContentFilters(currentFeed.filter))
+            predicates.push(
+                contentFilterPredicate(
+                    sids,
+                    contentFiltersForSources(
+                        sids.map(sid => state.sources[sid]).filter(Boolean),
+                        state.groups,
+                        state.page.readerPreferences
+                    )
+                )
+            )
         if (date) {
             predicates.push(
                 before ? db.items.date.lte(date) : db.items.date.gte(date)
             )
         }
         const query = lf.op.and.apply(null, predicates)
+        const selected = (await db.itemsDB
+            .select()
+            .from(db.items)
+            .where(query)
+            .exec()) as RSSItem[]
+        const iids = new Set(selected.map(item => item._id))
+        if (!iids.size) return
+        const hooks = dispatch(getServiceHooks())
+        let syncedInBulk = false
+        if (hooks.markAllRead && selected.some(item => item.serviceRef)) {
+            // Keep the service's batch API when the selection covers its whole range.
+            const range = [db.items.source.in(sids), db.items.hasRead.eq(false)]
+            if (date)
+                range.push(
+                    before ? db.items.date.lte(date) : db.items.date.gte(date)
+                )
+            const total = await db.itemsDB
+                .select(lf.fn.count(db.items._id))
+                .from(db.items)
+                .where(lf.op.and(...range))
+                .exec()
+            if (total[0]["COUNT(_id)"] === selected.length) {
+                const action = hooks.markAllRead(sids, date, before)
+                if (action) {
+                    await dispatch(action)
+                    syncedInBulk = true
+                }
+            }
+        }
         await db.itemsDB
             .update(db.items)
             .set(db.items.hasRead, true)
-            .where(query)
+            .where(db.items._id.in([...iids]))
             .exec()
-        if (date) {
-            dispatch({
-                type: MARK_ALL_READ,
-                sids: sids,
-                time: date.getTime(),
-                before: before,
-            })
-            dispatch(updateUnreadCounts())
-        } else {
-            dispatch({
-                type: MARK_ALL_READ,
-                sids: sids,
-            })
-        }
+        dispatch({ type: MARK_ALL_READ, sids, iids })
+        await dispatch(updateUnreadCounts())
+        if (!syncedInBulk)
+            for (const item of selected) {
+                const action = item.serviceRef && hooks.markRead?.(item)
+                if (action) await dispatch(action)
+            }
     }
 }
 
@@ -684,6 +753,7 @@ export function markUnread(item: RSSItem): AppThunk {
                 .where(db.items._id.eq(item._id))
                 .set(db.items.hasRead, false)
                 .exec()
+                .then(() => dispatch(updateUnreadCounts()))
             dispatch(markUnreadDone(item))
             if (item.serviceRef) {
                 dispatch(dispatch(getServiceHooks()).markUnread?.(item))
@@ -725,6 +795,7 @@ export function toggleHidden(item: RSSItem): AppThunk {
             .where(db.items._id.eq(item._id))
             .set(db.items.hidden, !item.hidden)
             .exec()
+            .then(() => dispatch(updateUnreadCounts()))
         dispatch(toggleHiddenDone(item))
     }
 }
@@ -820,7 +891,11 @@ export function itemReducer(
             let nextState = { ...state }
             let sids = new Set(action.sids)
             for (let item of Object.values(state)) {
-                if (sids.has(item.source) && !item.hasRead) {
+                if (
+                    sids.has(item.source) &&
+                    !item.hasRead &&
+                    (!action.iids || action.iids.has(item._id))
+                ) {
                     if (
                         !action.time ||
                         (action.before

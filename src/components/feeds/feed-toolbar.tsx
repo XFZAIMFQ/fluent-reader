@@ -6,7 +6,11 @@ import { SourceCategory } from "../../schema-types"
 import { makeStyles, mergeClasses } from "@fluentui/react-components"
 import { fetchCurrentItems } from "../../scripts/models/item"
 import { FilterType } from "../../scripts/models/feed"
-import { switchFilter, setMediaLayout } from "../../scripts/models/page"
+import {
+    switchFilter,
+    toggleFilter,
+    setMediaLayout,
+} from "../../scripts/models/page"
 import { openMarkAllMenu } from "../../scripts/models/app"
 import { useAppDispatch, useAppSelector } from "../../scripts/reducer"
 import { FlatButton } from "../utils/FlatButton"
@@ -154,6 +158,22 @@ const FeedToolbar: React.FC = () => {
                 onClick={() => dispatch(openMarkAllMenu())}>
                 <Icon iconName="InboxCheck" />
             </FlatButton>
+            {!collection && (
+                <FlatButton
+                    styleClass={mergeClasses(
+                        classes.button,
+                        Boolean(filter & FilterType.ShowExcluded) &&
+                            classes.active
+                    )}
+                    ariaLabel={intl.get("contentFilter.showExcluded")}
+                    title={intl.get("contentFilter.showExcluded")}
+                    aria-pressed={Boolean(filter & FilterType.ShowExcluded)}
+                    onClick={() =>
+                        dispatch(toggleFilter(FilterType.ShowExcluded))
+                    }>
+                    <Icon iconName="Filter" />
+                </FlatButton>
+            )}
         </FlatButtonGroup>
     )
 }

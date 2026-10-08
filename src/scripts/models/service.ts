@@ -3,6 +3,7 @@ import lf from "lovefield"
 import { SyncService, ServiceConfigs } from "../../schema-types"
 import { AppThunk, ActionStatus } from "../utils"
 import { RSSItem, insertItems, fetchItemsSuccess } from "./item"
+import { matchesContentFilters, resolveContentFilters } from "../content-filter"
 import { saveSettings, pushNotification } from "./app"
 import {
     deleteSource,
@@ -251,9 +252,22 @@ function fetchItems(
         if (items.length > 0) {
             const inserted = await insertItems(items)
             dispatch(fetchItemsSuccess(inserted.reverse(), getState().items))
+            await dispatch(updateUnreadCounts())
             if (background) {
                 for (let item of inserted) {
-                    if (item.notify) dispatch(pushNotification(item))
+                    const state = getState()
+                    if (
+                        item.notify &&
+                        matchesContentFilters(
+                            resolveContentFilters(
+                                state.sources[item.source],
+                                state.groups,
+                                state.page.readerPreferences
+                            ),
+                            item
+                        )
+                    )
+                        dispatch(pushNotification(item))
                 }
                 if (inserted.length > 0) window.utils.requestAttention()
             }

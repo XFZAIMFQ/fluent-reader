@@ -8,15 +8,7 @@ import {
     parseRSS,
     MyParserItem,
 } from "../utils"
-import {
-    RSSItem,
-    insertItems,
-    ItemActionTypes,
-    FETCH_ITEMS,
-    MARK_READ,
-    MARK_UNREAD,
-    MARK_ALL_READ,
-} from "./item"
+import { RSSItem, insertItems, ItemActionTypes } from "./item"
 import { saveSettings } from "./app"
 import { SourceRule } from "./rule"
 import { fixBrokenGroups } from "./group"
@@ -28,6 +20,12 @@ import {
 import { sourceMetadata, httpUrl } from "../source-metadata"
 import { validateFavicon } from "../utils"
 import { latestPublicationDate } from "../feed-scheduler"
+import {
+    ContentFilters,
+    contentFiltersForSources,
+    contentFilterPredicate,
+    validContentFilter,
+} from "../content-filter"
 
 export const enum SourceOpenTarget {
     Local,
@@ -89,7 +87,8 @@ export class RSSSource {
 
     private static async checkItem(
         source: RSSSource,
-        item: MyParserItem
+        item: MyParserItem,
+        updated?: (item: RSSItem) => void
     ): Promise<RSSItem> {
         let i = new RSSItem(item, source)
         const items = (await db.itemsDB
@@ -109,18 +108,28 @@ export class RSSSource {
             if (source.rules) SourceRule.applyAll(source.rules, i)
             return i
         } else {
+            // Enrich old entries when they reappear; preserve their reading state.
+            if (item.categories && items[0].tags !== i.tags) {
+                await db.itemsDB
+                    .update(db.items)
+                    .where(db.items._id.eq(items[0]._id))
+                    .set(db.items.tags, i.tags)
+                    .exec()
+                updated?.({ ...items[0], tags: i.tags })
+            }
             return null
         }
     }
 
     static checkItems(
         source: RSSSource,
-        items: MyParserItem[]
+        items: MyParserItem[],
+        updated?: (item: RSSItem) => void
     ): Promise<RSSItem[]> {
         return new Promise<RSSItem[]>((resolve, reject) => {
             let p = new Array<Promise<RSSItem>>()
             for (let item of items) {
-                p.push(this.checkItem(source, item))
+                p.push(this.checkItem(source, item, updated))
             }
             Promise.all(p)
                 .then(values => {
@@ -134,8 +143,12 @@ export class RSSSource {
 
     static async fetchItems(source: RSSSource) {
         let feed = await parseRSS(source.url)
+        const updatedItems: RSSItem[] = []
         return {
-            items: await this.checkItems(source, feed.items),
+            items: await this.checkItems(source, feed.items, item =>
+                updatedItems.push(item)
+            ),
+            updatedItems,
             metadata: sourceMetadata(source.url, feed),
             publishedAt: latestPublicationDate(feed.items),
         }
@@ -234,11 +247,23 @@ export function initSourcesFailure(err): SourceActionTypes {
     }
 }
 
-async function unreadCount(sources: SourceState): Promise<SourceState> {
+async function unreadCount(
+    sources: SourceState,
+    filters: ContentFilters
+): Promise<SourceState> {
     const rows = await db.itemsDB
         .select(db.items.source, lf.fn.count(db.items._id))
         .from(db.items)
-        .where(db.items.hasRead.eq(false))
+        .where(
+            lf.op.and(
+                db.items.hasRead.eq(false),
+                db.items.hidden.eq(false),
+                contentFilterPredicate(
+                    Object.values(sources).map(source => source.sid),
+                    filters
+                )
+            )
+        )
         .groupBy(db.items.source)
         .exec()
     for (let row of rows) {
@@ -247,6 +272,7 @@ async function unreadCount(sources: SourceState): Promise<SourceState> {
     return sources
 }
 
+let unreadRequest = 0
 export function updateUnreadCounts(): AppThunk<Promise<void>> {
     return async (dispatch, getState) => {
         const sources: SourceState = {}
@@ -256,15 +282,32 @@ export function updateUnreadCounts(): AppThunk<Promise<void>> {
                 unreadCount: 0,
             }
         }
+        const request = ++unreadRequest
+        const state = getState()
+        const counted = await unreadCount(
+            sources,
+            contentFiltersForSources(
+                Object.values(sources),
+                state.groups,
+                state.page.readerPreferences
+            )
+        )
+        if (request !== unreadRequest) return
+        const latest: SourceState = {}
+        for (const source of Object.values(getState().sources))
+            latest[source.sid] = {
+                ...source,
+                unreadCount: counted[source.sid]?.unreadCount || 0,
+            }
         dispatch({
             type: UPDATE_UNREAD_COUNTS,
-            sources: await unreadCount(sources),
+            sources: latest,
         })
     }
 }
 
 export function initSources(): AppThunk<Promise<void>> {
-    return async dispatch => {
+    return async (dispatch, getState) => {
         dispatch(initSourcesRequest())
         await db.init()
         const sources = (await db.sourcesDB
@@ -276,8 +319,15 @@ export function initSources(): AppThunk<Promise<void>> {
             source.unreadCount = 0
             state[source.sid] = source
         }
-        await unreadCount(state)
         dispatch(fixBrokenGroups(state))
+        await unreadCount(
+            state,
+            contentFiltersForSources(
+                Object.values(state),
+                getState().groups,
+                getState().page.readerPreferences
+            )
+        )
         dispatch(initSourcesSuccess(state))
     }
 }
@@ -356,6 +406,7 @@ export function addSource(
                 dispatch(updateFavicon([inserted.sid]))
                 const items = await RSSSource.checkItems(inserted, feed.items)
                 await insertItems(items)
+                await dispatch(updateUnreadCounts())
                 return inserted.sid
             } catch (e) {
                 dispatch(addSourceFailure(e, batch))
@@ -382,6 +433,8 @@ export function updateSourceDone(source: RSSSource): SourceActionTypes {
 
 export function updateSource(source: RSSSource): AppThunk<Promise<void>> {
     return async dispatch => {
+        if (!validContentFilter(source.policy?.contentFilter))
+            throw new Error(intl.get("rules.badRegex"))
         let sourceCopy = { ...source }
         delete sourceCopy.unreadCount
         const row = db.sources.createRow(sourceCopy)
@@ -562,60 +615,6 @@ export function sourceReducer(
         case DELETE_SOURCE: {
             delete state[action.source.sid]
             return { ...state }
-        }
-        case FETCH_ITEMS: {
-            switch (action.status) {
-                case ActionStatus.Success: {
-                    let updateMap = new Map<number, number>()
-                    for (let item of action.items) {
-                        if (!item.hasRead) {
-                            updateMap.set(
-                                item.source,
-                                updateMap.has(item.source)
-                                    ? updateMap.get(item.source) + 1
-                                    : 1
-                            )
-                        }
-                    }
-                    let nextState = {} as SourceState
-                    for (let [s, source] of Object.entries(state)) {
-                        let sid = parseInt(s)
-                        if (updateMap.has(sid)) {
-                            nextState[sid] = {
-                                ...source,
-                                unreadCount:
-                                    source.unreadCount + updateMap.get(sid),
-                            } as RSSSource
-                        } else {
-                            nextState[sid] = source
-                        }
-                    }
-                    return nextState
-                }
-                default:
-                    return state
-            }
-        }
-        case MARK_UNREAD:
-        case MARK_READ:
-            return {
-                ...state,
-                [action.item.source]: {
-                    ...state[action.item.source],
-                    unreadCount:
-                        state[action.item.source].unreadCount +
-                        (action.type === MARK_UNREAD ? 1 : -1),
-                } as RSSSource,
-            }
-        case MARK_ALL_READ: {
-            let nextState = { ...state }
-            action.sids.forEach(sid => {
-                nextState[sid] = {
-                    ...state[sid],
-                    unreadCount: action.time ? state[sid].unreadCount : 0,
-                }
-            })
-            return nextState
         }
         default:
             return state

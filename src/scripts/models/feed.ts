@@ -17,6 +17,13 @@ import {
 } from "./item"
 import { ActionStatus, AppThunk, mergeSortedArrays } from "../utils"
 import { PageActionTypes, SELECT_PAGE, PageType, APPLY_FILTER } from "./page"
+import type { RootState } from "../reducer"
+import {
+    ContentFilters,
+    contentFiltersForSources,
+    contentFilterPredicate,
+    matchesContentFilters,
+} from "../content-filter"
 
 export enum FilterType {
     None,
@@ -26,24 +33,26 @@ export enum FilterType {
     FullSearch = 1 << 3,
     CaseInsensitive = 1 << 4,
     CreatorSearch = 1 << 5,
+    ShowExcluded = 1 << 6,
 
     Default = ShowRead | ShowNotStarred,
     UnreadOnly = ShowNotStarred,
     StarredOnly = ShowRead,
-    Toggles = ShowHidden | FullSearch | CaseInsensitive,
+    Toggles = ShowHidden | FullSearch | CaseInsensitive | ShowExcluded,
 }
 export class FeedFilter {
     type: FilterType
     search: string
 
     constructor(type: FilterType = null, search = "") {
+        const savedSettings = type === null
         if (
             type === null &&
             (type = window.settings.getFilterType()) === null
         ) {
             type = FilterType.Default | FilterType.CaseInsensitive
         }
-        this.type = type
+        this.type = savedSettings ? type & ~FilterType.ShowExcluded : type
         this.search = search
     }
 
@@ -100,6 +109,36 @@ export const SOURCE = "SOURCE"
 
 const LOAD_QUANTITY = 50
 
+export function withContentFilters(feed: RSSFeed, state: RootState): RSSFeed {
+    return {
+        ...feed,
+        contentFilters: contentFiltersForSources(
+            feed.sids.map(sid => state.sources[sid]).filter(Boolean),
+            state.groups,
+            state.page.readerPreferences
+        ),
+    }
+}
+
+export function bypassContentFilters(filter: FeedFilter): boolean {
+    return (
+        Boolean(filter.type & FilterType.ShowExcluded) ||
+        !(filter.type & FilterType.ShowNotStarred)
+    )
+}
+
+export function testFeedItem(feed: RSSFeed, item: RSSItem): boolean {
+    return (
+        Boolean(item) &&
+        FeedFilter.testItem(feed.filter, item) &&
+        (bypassContentFilters(feed.filter) ||
+            matchesContentFilters(
+                feed.contentFilters?.[item.source] || [],
+                item
+            ))
+    )
+}
+
 export class RSSFeed {
     _id: string
     loaded: boolean
@@ -108,6 +147,7 @@ export class RSSFeed {
     sids: number[]
     iids: number[]
     filter: FeedFilter
+    contentFilters: ContentFilters = {}
 
     constructor(id: string = null, sids = [], filter = null) {
         this._id = id
@@ -125,6 +165,10 @@ export class RSSFeed {
     ): Promise<RSSItem[]> {
         const predicates = FeedFilter.toPredicates(feed.filter)
         predicates.push(db.items.source.in(feed.sids))
+        if (!bypassContentFilters(feed.filter))
+            predicates.push(
+                contentFilterPredicate(feed.sids, feed.contentFilters)
+            )
         return (await db.itemsDB
             .select()
             .from(db.items)
@@ -182,11 +226,10 @@ export function dismissItems(): AppThunk {
     return (dispatch, getState) => {
         const state = getState()
         let fid = state.page.feedId
-        let filter = state.feeds[fid].filter
         let iids = new Set<number>()
         for (let iid of state.feeds[fid].iids) {
             let item = state.items[iid]
-            if (!FeedFilter.testItem(filter, item)) {
+            if (!testFeedItem(state.feeds[fid], item)) {
                 iids.add(iid)
             }
         }
@@ -237,9 +280,16 @@ export function initFeeds(force = false): AppThunk<Promise<void>> {
         let promises = new Array<Promise<void>>()
         for (let feed of Object.values(getState().feeds)) {
             if (!feed.loaded || force) {
+                const original = feed
+                const request = nextFeedRequest(feed._id)
+                feed = withContentFilters(feed, getState())
                 let p = RSSFeed.loadFeed(feed)
                     .then(items => {
-                        dispatch(initFeedSuccess(feed, items))
+                        if (
+                            feedRequests.get(feed._id) === request &&
+                            getState().feeds[feed._id] === original
+                        )
+                            dispatch(initFeedSuccess(feed, items))
                     })
                     .catch(err => {
                         console.log(err)
@@ -252,6 +302,13 @@ export function initFeeds(force = false): AppThunk<Promise<void>> {
             dispatch(initFeedsSuccess())
         })
     }
+}
+
+const feedRequests = new Map<string, number>()
+function nextFeedRequest(id: string): number {
+    const request = (feedRequests.get(id) || 0) + 1
+    feedRequests.set(id, request)
+    return request
 }
 
 export function loadMoreRequest(feed: RSSFeed): FeedActionTypes {
@@ -286,18 +343,27 @@ export function loadMoreFailure(feed: RSSFeed, err): FeedActionTypes {
 export function loadMore(feed: RSSFeed): AppThunk<Promise<void>> {
     return (dispatch, getState) => {
         if (feed.loaded && !feed.loading && !feed.allLoaded) {
+            const request = nextFeedRequest(feed._id)
             dispatch(loadMoreRequest(feed))
             const state = getState()
+            const original = state.feeds[feed._id]
+            feed = withContentFilters(feed, state)
             const skipNum = feed.iids.filter(i =>
-                FeedFilter.testItem(feed.filter, state.items[i])
+                testFeedItem(feed, state.items[i])
             ).length
             return RSSFeed.loadFeed(feed, skipNum)
                 .then(items => {
-                    dispatch(loadMoreSuccess(feed, items))
+                    if (
+                        feedRequests.get(feed._id) === request &&
+                        getState().feeds[feed._id]?.sids === original.sids &&
+                        getState().feeds[feed._id]?.filter === original.filter
+                    )
+                        dispatch(loadMoreSuccess(feed, items))
                 })
                 .catch(e => {
                     console.log(e)
-                    dispatch(loadMoreFailure(feed, e))
+                    if (feedRequests.get(feed._id) === request)
+                        dispatch(loadMoreFailure(feed, e))
                 })
         }
         return new Promise((_, reject) => {
@@ -376,7 +442,7 @@ export function feedReducer(
                             let items = action.items.filter(
                                 i =>
                                     feed.sids.includes(i.source) &&
-                                    FeedFilter.testItem(feed.filter, i)
+                                    testFeedItem(feed, i)
                             )
                             if (items.length > 0) {
                                 let oldItems = feed.iids.map(
@@ -416,6 +482,7 @@ export function feedReducer(
                         [action.feed._id]: {
                             ...action.feed,
                             loaded: true,
+                            loading: false,
                             allLoaded: action.items.length < LOAD_QUANTITY,
                             iids: action.items.map(i => i._id),
                         },
@@ -441,8 +508,10 @@ export function feedReducer(
                             loading: false,
                             allLoaded: action.items.length < LOAD_QUANTITY,
                             iids: [
-                                ...action.feed.iids,
-                                ...action.items.map(i => i._id),
+                                ...new Set([
+                                    ...state[action.feed._id].iids,
+                                    ...action.items.map(i => i._id),
+                                ]),
                             ],
                         },
                     }

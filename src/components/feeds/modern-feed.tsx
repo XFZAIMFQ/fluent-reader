@@ -20,6 +20,7 @@ import Time from "../utils/time"
 import FeedToolbar from "./feed-toolbar"
 import { Star16Filled } from "@fluentui/react-icons"
 import { SourceOpenTarget } from "../../scripts/models/source"
+import { readStatusIcon } from "../utils/read-status"
 
 const useStyles = makeStyles({
     pictures: {
@@ -278,11 +279,9 @@ const ModernFeed: React.FC<{
                                                 )
                                             }>
                                             <Icon
-                                                iconName={
+                                                iconName={readStatusIcon(
                                                     item.hasRead
-                                                        ? "RadioBtnOn"
-                                                        : "StatusCircleRing"
-                                                }
+                                                )}
                                             />
                                         </button>
                                         <button

@@ -43,10 +43,31 @@ export interface MediaLayout {
 
 export type ReadBehavior = "auto" | "manual"
 export type UpdateStrategy = "interval" | "publication"
+export interface ContentFilterRule {
+    field: "tags" | "title" | "content" | "creator"
+    pattern: string
+    regex: boolean
+    exclude: boolean
+    caseSensitive: boolean
+}
+export interface ContentFilterPlan {
+    id: string
+    name: string
+    enabled: boolean
+    match: "all" | "any"
+    rules: ContentFilterRule[]
+}
+export interface ContentFilter {
+    mode: "inherit" | "append" | "replace" | "off"
+    match: "all" | "any"
+    rules: ContentFilterRule[]
+    plans?: ContentFilterPlan[] // absent on filters saved before named plans
+}
 export interface SubscriptionPolicy {
     readBehavior?: ReadBehavior
     frequency?: number // minutes; absent means inherit, zero means manual only
     strategy?: UpdateStrategy
+    contentFilter?: ContentFilter
 }
 export interface ReaderPreferences {
     startupFetch: boolean

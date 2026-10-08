@@ -4,6 +4,7 @@ import lf from "lovefield"
 import { RSSSource } from "./models/source"
 import { RSSItem } from "./models/item"
 import { SourceCategory } from "../schema-types"
+import { articleText } from "./item-content"
 
 const sdbSchema = lf.schema.create("sourcesDB", 7)
 sdbSchema
@@ -39,7 +40,7 @@ sdbSchema
     ])
     .addIndex("idxURL", ["url"], true)
 
-const idbSchema = lf.schema.create("itemsDB", 2)
+const idbSchema = lf.schema.create("itemsDB", 3)
 idbSchema
     .createTable("items")
     .addColumn("_id", lf.Type.INTEGER)
@@ -59,7 +60,9 @@ idbSchema
     .addColumn("notify", lf.Type.BOOLEAN)
     .addColumn("serviceRef", lf.Type.STRING)
     .addColumn("media", lf.Type.STRING)
-    .addNullable(["thumb", "creator", "serviceRef"])
+    .addColumn("tags", lf.Type.STRING)
+    .addColumn("contentText", lf.Type.STRING)
+    .addNullable(["thumb", "creator", "serviceRef", "tags", "contentText"])
     .addIndex("idxDate", ["date"], false, lf.Order.DESC)
     .addIndex("idxService", ["serviceRef"], false)
 
@@ -100,6 +103,10 @@ async function onUpgradeItemDB(rawDb: lf.raw.BackStore) {
     if (rawDb.getVersion() < 2) {
         await rawDb.addTableColumn("items", "media", "{}")
     }
+    if (rawDb.getVersion() < 3) {
+        await rawDb.addTableColumn("items", "tags", "")
+        await rawDb.addTableColumn("items", "contentText", null)
+    }
 }
 
 export async function init() {
@@ -109,6 +116,29 @@ export async function init() {
     items = itemsDB.getSchema().table("items")
     if (window.settings.getNeDBStatus()) {
         await migrateNeDB()
+    }
+    // Backfill searchable text without changing read, starred or hidden state.
+    while (true) {
+        const pending = (await itemsDB
+            .select()
+            .from(items)
+            .where(items.contentText.isNull())
+            .limit(200)
+            .exec()) as RSSItem[]
+        if (!pending.length) break
+        await itemsDB
+            .createTransaction()
+            .exec(
+                pending.map(item =>
+                    itemsDB
+                        .update(items)
+                        .where(items._id.eq(item._id))
+                        .set(
+                            items.contentText,
+                            articleText(item.content, item.snippet)
+                        )
+                )
+            )
     }
 }
 
@@ -166,6 +196,8 @@ async function migrateNeDB() {
             doc.hidden = Boolean(doc.hidden)
             doc.notify = Boolean(doc.notify)
             doc.media = "{}"
+            doc.tags = ""
+            doc.contentText = articleText(doc.content, doc.snippet)
             return items.createRow(doc)
         })
         await Promise.all([

@@ -19,6 +19,7 @@ import {
 import { shareSubmenu } from "./context-menu"
 import { platformCtrl, decodeFetchResponse } from "../scripts/utils"
 import { Spinner } from "@fluentui/react-components"
+import { readStatusIcon } from "./utils/read-status"
 
 const FONT_SIZE_OPTIONS = [12, 13, 14, 15, 16, 17, 18, 19, 20]
 
@@ -399,17 +400,14 @@ class Article extends React.Component<ArticleProps, ArticleState> {
                         ? intl.get("article.markUnread")
                         : intl.get("article.markRead")
                 }
-                iconProps={
+                ariaLabel={
                     this.props.item.hasRead
-                        ? { iconName: "StatusCircleRing" }
-                        : {
-                              iconName: "RadioBtnOn",
-                              style: {
-                                  fontSize: 14,
-                                  textAlign: "center",
-                              },
-                          }
+                        ? intl.get("article.markUnread")
+                        : intl.get("article.markRead")
                 }
+                iconProps={{
+                    iconName: readStatusIcon(this.props.item.hasRead),
+                }}
                 onClick={() => this.props.toggleHasRead(this.props.item)}
             />
             <CommandBarButton

@@ -18,23 +18,14 @@ export function resolveSubscriptionPolicy(
     source: RSSSource,
     groups: SourceGroup[],
     preferences: ReaderPreferences
-): Required<SubscriptionPolicy> {
-    const domain = source.autoGroup !== false && websiteDomain(source.siteUrl)
-    const group =
-        groups.find(
-            group => group.isMultiple && group.sids.includes(source.sid)
-        ) ||
-        (domain &&
-            groups.find(
-                group =>
-                    group.isMultiple &&
-                    group.name.trim().toLowerCase() === domain
-            ))
-    const inherited = group
-        ? group.policy
-        : domain
-        ? preferences.domainPolicies[domain]
-        : undefined
+): Required<
+    Pick<SubscriptionPolicy, "strategy" | "readBehavior" | "frequency">
+> {
+    const inherited = inheritedSubscriptionPolicy(
+        source,
+        groups,
+        preferences
+    ).policy
     return {
         strategy:
             source.policy?.strategy ??
@@ -49,6 +40,29 @@ export function resolveSubscriptionPolicy(
             inherited?.frequency ??
             preferences.frequency,
     }
+}
+
+export function inheritedSubscriptionPolicy(
+    source: RSSSource,
+    groups: SourceGroup[],
+    preferences: ReaderPreferences
+): { policy?: SubscriptionPolicy; name?: string } {
+    const domain = source.autoGroup !== false && websiteDomain(source.siteUrl)
+    const group =
+        groups.find(
+            group => group.isMultiple && group.sids.includes(source.sid)
+        ) ||
+        (domain &&
+            groups.find(
+                group =>
+                    group.isMultiple &&
+                    group.name.trim().toLowerCase() === domain
+            ))
+    return group
+        ? { policy: group.policy, name: group.name }
+        : domain
+        ? { policy: preferences.domainPolicies[domain], name: domain }
+        : {}
 }
 
 export function feedWebsite(source: RSSSource): string {

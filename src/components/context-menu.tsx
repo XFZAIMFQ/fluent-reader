@@ -1,6 +1,7 @@
 import * as React from "react"
 import intl from "react-intl-universal"
 import QRCode from "qrcode.react"
+import { readStatusIcon } from "./utils/read-status"
 import {
     cutText,
     webSearch,
@@ -124,12 +125,7 @@ function ItemContextMenu() {
             text: item.hasRead
                 ? intl.get("article.markUnread")
                 : intl.get("article.markRead"),
-            iconProps: item.hasRead
-                ? {
-                      iconName: "RadioBtnOn",
-                      style: { fontSize: 14, textAlign: "center" },
-                  }
-                : { iconName: "StatusCircleRing" },
+            iconProps: { iconName: readStatusIcon(item.hasRead) },
             onClick: () => {
                 if (item.hasRead) {
                     dispatch(markUnread(item))

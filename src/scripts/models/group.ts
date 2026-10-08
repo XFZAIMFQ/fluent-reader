@@ -9,6 +9,7 @@ import {
     updateSource,
 } from "./source"
 import { SourceCategory, SourceGroup } from "../../schema-types"
+import { validContentFilter } from "../content-filter"
 import { ActionStatus, AppThunk, domParser } from "../utils"
 import { saveSettings } from "./app"
 import { mergeNamedGroups, subscriptionGroups } from "../sidebar-groups"
@@ -205,6 +206,8 @@ function updateSourceGroupDone(group: SourceGroup): SourceGroupActionTypes {
 
 export function updateSourceGroup(group: SourceGroup): AppThunk<Promise<void>> {
     return async (dispatch, getState) => {
+        if (!validContentFilter(group.policy?.contentFilter))
+            throw new Error(intl.get("rules.badRegex"))
         const name = group.name.trim()
         if (
             !name ||

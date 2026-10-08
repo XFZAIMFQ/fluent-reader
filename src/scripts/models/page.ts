@@ -460,7 +460,9 @@ function applyFilter(filter: FeedFilter): AppThunk {
     return (dispatch, getState) => {
         const oldFilterType = getState().page.filter.type
         if (filter.type !== oldFilterType && !getState().page.collection)
-            globalThis.settings.setFilterType(filter.type)
+            globalThis.settings.setFilterType(
+                filter.type & ~FilterType.ShowExcluded
+            )
         dispatch(applyFilterDone(filter))
         dispatch(initFeeds(true))
     }
