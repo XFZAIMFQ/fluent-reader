@@ -25,7 +25,7 @@ The repo of the mobile version of this app [can be found here](https://github.co
 ## Features
 
 <p align="center">
-  <img src="https://github.com/yang991178/fluent-reader/raw/master/docs/imgs/screenshot.jpg">
+  <img src="docs/previews/pictures.png" alt="Current Fluent Reader picture grid with website grouping and favorites">
 </p>
 
 - A modern UI inspired by Fluent Design System with full dark mode support.
@@ -34,10 +34,36 @@ The repo of the mobile version of this app [can be found here](https://github.co
 - Importing or exporting OPML files, full application data backup & restoration.
 - Read the full content with the built-in article view or load webpages by default.
 - Search for articles with regular expressions or filter by read status.
-- Organize your subscriptions with folder-like groupings.
+- Switch between articles, social media, pictures, and videos with dedicated layouts.
+- Group subscriptions automatically by website or create your own groups, with drag-and-drop organization.
+- Browse favorites within each content category, with persistent star markers on media cards.
+- Manage subscriptions and groups with searchable lists, detail panels, and saved ordering.
+- Choose automatic or manual read marking per subscription or group.
+- Read media in an overlay or in the second column, with breadcrumbs and an article switching menu.
 - Single-key [keyboard shortcuts](https://github.com/yang991178/fluent-reader/wiki/Support#keyboard-shortcuts).
 - Hide, mark as read, or star articles automatically as they arrive with regular expression rules.
-- Fetch articles in the background and send push notifications.
+- Fetch articles in the background with per-source update policies, publication-based scheduling, and website request limits.
+- Send push notifications for new articles.
+
+### Design reference
+
+The current UI layout and interaction flow in this development branch are designed
+with [Folo](https://github.com/RSSNext/Folo) as a reference. This includes content
+categories, website grouping, drag-and-drop organization, media card layouts,
+category-specific favorites, and inline reading with breadcrumb navigation.
+
+These interactions are adapted to Fluent Reader's existing Electron and React
+architecture. Thanks to the Folo team for the design and interaction inspiration.
+
+### Current interface and usage
+
+See the [current preview gallery](docs/previews/README.md) for reading layouts, settings,
+group management, favorites, and dark mode. The [Chinese usage guide](docs/reader-guide.md)
+explains grouping, update policies, read marking, and inline media navigation.
+
+The screenshots were refreshed on October 1, 2026 with the English interface and real
+cached subscriptions in isolated profiles. Feed content remains in its original language;
+the settings shown are examples rather than application defaults.
 
 Support for other RSS services are [under fundraising](https://github.com/yang991178/fluent-reader/issues/23). 
 
